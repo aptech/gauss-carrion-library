@@ -1,0 +1,1630 @@
+
+
+
+/*
+** Procedure to compute the tests in Pedroni (1999)
+**
+**  INPUT:
+**
+**	    model  =  0	for the model that does not include any deterministic terms (Pedroni,  1999),
+**	    model  =  1	for the model that includes a constant term (Pedroni,  1999),
+**	    model  =  2	for the model that includes a time trend (Pedroni,  1999),
+**
+**	    model  =  3	for the model that includes a constant term and a level shift (no shift in the cointegrating vector),
+**	    model  =  4	for the model that includes a time trend with a level shift (no shift in the cointegrating vector),
+**	    model  =  5	for the model that includes a time trend with both level and slope trend shift (no shift in the cointegrating vector),
+**
+**	    model  =  6	for the model that includes a constant term,  with both level and cointegrating vector shifts,
+**	    model  =  7	for the model that includes a time trend,  with both level and cointegrating vector shifts,
+**	    model  =  8	for the model that includes a time trend,  with both time trend and cointegrating vector shifts.
+**
+**	    Boot		(2x1)-vector. If Boot[1]  =  1 the bootstrapped distribution is computed; put any other value if not.
+**			        Boot[2] denotes the number of replications to compute the bootstrapped distribution.
+**
+**
+** OUTPUT:
+**
+**      t_test      Scalar,  the pseudo t-ratio statistic,
+**      rho_test    Scalar,  the normalised bias statistic,
+**      Tb          Vector that includes the estimated break points for each individual. The firts column for the pseudo t-ratio test,
+**                  and the second column for the normalised bias.
+*/
+
+
+proc (3) = ped_t7(y, x, model, method, p_max, estima);
+    
+    local T,  N,  k,  i,  temp,  y_i,  x_i,  j,  z,  b,  e_hat,  p,  t_adf,  rho_adf,  t_adf_min,  rho_adf_min,  p_min,  Tbe_t,  Tbe_rho,
+        m_adf,  Emeanvar,  test_t,  test_rho;
+    local mean_t, var_t, mean_rho, var_rho;
+    local m_err,  bic,  m_tbe;
+    
+    T = rows(y); @ Sample size @
+    N = cols(y); @ Number of individuals @
+    k = cols(x)/N; @ Number of regressors @
+    
+    m_adf = zeros(N, 3); @ Matrix to store the individual t_ADF,  the normalised bias tests and the order of the autoregressive correction @
+    m_err = zeros(T, N); @ Matrix to store the residuals of the cointegrating equation @
+    
+    m_tbe = zeros(N, 2); @ Matrix to store the break dates @
+    
+    i = 1;
+    do until i>N; @ Compute the individual cointegration regressions @
+        
+        /*
+        temp = y[., i]~x[., i];
+        temp = selif(temp, temp[., 1] .ne -9999); @ -9999 denotes missing value @
+        
+        y_i  =  temp[., 1]; @ Endogenous variable; -9999 denotes missing value @
+        x_i  =  temp[., 2:cols(temp)]; @ First exogenous variable; -9999 denotes missing value @
+        */
+        
+        y_i  =  y[., i]; @ Endogenous variable @
+        x_i  =  x[., i]; @ First exogenous variable @
+        
+        
+        if k > 1; @ Select the addtional stochastic regressors if necessary @
+            j  =  2;
+            do until j>k;
+                x_i = x_i~x[., i+(j-1)*N]; @ Additional regressors @
+                j = j+1;
+            endo;
+        endif;
+        
+        if model[1] == 0;
+            {b,  e_hat,  p,  bic}  =  coint_estima(y_i, x_i, estima[1], model[1], estima[2], estima[3], 0);
+            {t_adf, rho_adf, p}  =  ADFRC(e_hat, method, p_max); @ ADF Cointegration test @
+            
+            if estima[1] ==  1;
+                m_err[., i] = e_hat;
+            elseif estima[1] ==  2;
+                m_err[bic[2]+2:T-bic[3], i] = e_hat;
+            endif;
+            
+        elseif (model[1] ==  1) or (model[1] ==  2);
+            
+            {b,  e_hat,  p,  bic}  =  coint_estima(y_i, x_i, estima[1], model[1], estima[2], estima[3], 0);
+            {t_adf, rho_adf, p}  =  ADFRC(e_hat, method, p_max); @ ADF Cointegration test @
+            
+            if estima[1] ==  1;
+                m_err[., i] = e_hat;
+            elseif estima[1] ==  2;
+                m_err[bic[2]+2:T-bic[3], i] = e_hat;
+            endif;
+            
+        elseif (model[1] ==  3) or (model[1] ==  4) or (model[1] ==  5); @ Models with shift in the deterministics @
+            
+            t_adf_min = 1e6;
+            rho_adf_min = 1e6;
+            p_min = 1e6;
+            Tbe_t = 0;
+            Tbe_rho = 0;
+            j = 2;
+            do until j>t-2;
+                z = determi(model[1], t, j); @ Deterministic regressors. Model[2]  =  j because there is a break @
+                {b,  e_hat,  p}  =  olsqr2(y_i, x_i~z); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+                {t_adf, rho_adf, p}  =  ADFRC(e_hat, method, p_max); @ ADF Cointegration test @
+                
+                if t_adf<t_adf_min;
+                    t_adf_min = t_adf;
+                    p_min = p;
+                    Tbe_t = j;
+                endif;
+                
+                if rho_adf<rho_adf_min;
+                    rho_adf_min = rho_adf;
+                    p_min = p;
+                    Tbe_rho = j;
+                endif;
+                
+                j = j+1;
+            endo;
+            
+            t_adf = t_adf_min;
+            p = p_min;
+            
+            rho_adf = rho_adf_min;
+            
+            m_tbe[i, .] = tbe_t~tbe_rho;
+            
+        elseif (model[1] ==  6); @ Level shift and coint. vector shift @
+            
+            t_adf_min = 1e6;
+            rho_adf_min = 1e6;
+            p_min = 1e6;
+            Tbe_t = 0;
+            Tbe_rho = 0;
+            j = 2;
+            do until j>t-2;
+                z = determi(3, t, j); @ Deterministic regressors. Model[1]  =  3 for the level shift; Model[2]  =  j because there is a break @
+                {b,  e_hat,  p}  =  olsqr2(y_i, z~x_i~x_i.*z[., 2]); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+                {t_adf, rho_adf, p}  =  ADFRC(e_hat, method, p_max); @ ADF Cointegration test @
+                
+                if t_adf<t_adf_min;
+                    t_adf_min = t_adf;
+                    p_min = p;
+                    Tbe_t = j;
+                endif;
+                
+                if rho_adf<rho_adf_min;
+                    rho_adf_min = rho_adf;
+                    p_min = p;
+                    Tbe_rho = j;
+                endif;
+                
+                j = j+1;
+            endo;
+            
+            t_adf = t_adf_min;
+            p = p_min;
+            
+            rho_adf = rho_adf_min;
+            
+            m_tbe[i, .] = tbe_t~tbe_rho;
+            
+        elseif model[1] ==  7; @ Level shift,  time trend and cointegrating vector shift @
+            
+            t_adf_min = 1e6;
+            rho_adf_min = 1e6;
+            p_min = 1e6;
+            Tbe_t = 0;
+            Tbe_rho = 0;
+            j = 2;
+            do until j>t-2;
+                z = determi(4, t, j); @ Deterministic regressors. Model[1]  =  4 for the level shift; Model[2]  =  j because there is a break @
+                {b,  e_hat,  p}  =  olsqr2(y_i, z~x_i~x_i.*z[., 2]); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+                {t_adf, rho_adf, p}  =  ADFRC(e_hat, method, p_max); @ ADF Cointegration test @
+                if t_adf<t_adf_min;
+                    t_adf_min = t_adf;
+                    p_min = p;
+                    Tbe_t = j;
+                endif;
+                
+                if rho_adf<rho_adf_min;
+                    rho_adf_min = rho_adf;
+                    p_min = p;
+                    Tbe_rho = j;
+                endif;
+                
+                j = j+1;
+            endo;
+            
+            t_adf = t_adf_min;
+            p = p_min;
+            
+            rho_adf = rho_adf_min;
+            
+            m_tbe[i, .] = tbe_t~tbe_rho;
+            
+        elseif model[1] ==  8; @ Level and slope shifts,  and cointegrating vector shift @
+            
+            t_adf_min = 1e6;
+            rho_adf_min = 1e6;
+            p_min = 1e6;
+            Tbe_t = 0;
+            Tbe_rho = 0;
+            j = 2;
+            do until j>t-2;
+                z = determi(5, t, j); @ Deterministic regressors. Model[1]  =  4 for the level shift; Model[2]  =  j because there is a break @
+                {b,  e_hat,  p}  =  olsqr2(y_i, z~x_i~x_i.*z[., 2]); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+                {t_adf, rho_adf, p}  =  ADFRC(e_hat, method, p_max); @ ADF Cointegration test @
+                
+                if t_adf<t_adf_min;
+                    t_adf_min = t_adf;
+                    p_min = p;
+                    Tbe_t = j;
+                endif;
+                
+                if rho_adf<rho_adf_min;
+                    rho_adf_min = rho_adf;
+                    p_min = p;
+                    Tbe_rho = j;
+                endif;
+                
+                j = j+1;
+            endo;
+            
+            t_adf = t_adf_min;
+            p = p_min;
+            
+            rho_adf = rho_adf_min;
+            
+            m_tbe[i, .] = tbe_t~tbe_rho;
+            
+        endif;
+        
+        m_adf[i, .] = t_adf~rho_adf~p;
+        
+        i = i+1;
+        
+    endo;
+    
+    {mean_t, var_t, mean_rho, var_rho} = rs_mean_var(model[1], k, p_max, T);
+    test_t  =  ((N^(-1/2)*sumc(m_adf[., 1]))-(mean_t)*sqrt(N))/sqrt(var_t);
+    test_rho  =  ((N^(-1/2)*sumc(m_adf[., 2]))-(mean_rho)*sqrt(N))/sqrt(var_rho);
+    
+    retp(test_t, test_rho, m_tbe);
+    
+endp;
+
+
+
+/*
+** Procedure to estimate the long-run relationship
+**
+*/
+
+proc(4) = coint_estima(y, x, method, model, klags, kleads, tb);
+    
+    local t,  b,  e_hat,  p,  z,  min_bic,  min_b,  min_e_hat,  min_p,  min_i,  min_j,  i,  j,  bic;
+    
+    t = rows(y);
+    
+    if method[1] ==  1; @ OLS @
+        
+        if model[1] ==  0;
+            {b,  e_hat,  p}  =  olsqr2(y, x);
+        elseif (model[1] ==  1) or (model[1] ==  2);
+            z = determi(model[1], t, 0); @ Deterministic regressors. Model[2] = 0 if there is no break @
+            {b,  e_hat,  p}  =  olsqr2(y, x~z); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+        endif;
+        
+        bic = -9999.99;
+        
+    elseif method[1] ==  2; @ DOLS @
+        
+        min_bic = 1e20;
+        min_b = 0;
+        min_e_hat = 0;
+        min_p = 0;
+        min_i = 0;
+        min_j = 0;
+        
+        i = 0;
+        do until i>klags;
+            j = 0;
+            do until j>kleads;
+                {b,  e_hat,  p,  bic}  =  DOLS(y, x, model, i, j, tb, T-klags-kleads);
+                if bic<min_bic;
+                    min_bic = bic;
+                    min_b = b;
+                    min_e_hat = e_hat;
+                    min_p = p;
+                    min_i = i;
+                    min_j = j;
+                endif;
+                j = j+1;
+            endo;
+            i = i+1;
+        endo;
+        
+        bic = min_bic|min_i|min_j;
+        b = min_b;
+        e_hat = min_e_hat;
+        p = min_p;
+        
+    endif;
+    
+    retp(b,  e_hat,  p,  bic);
+endp;
+
+
+
+
+
+
+/* Procedure to compute the DOLS estimations
+**
+** Sintaxis:
+**
+**  {_beta, residuals, bic}  =  DOLS(y, x, model, klags, kleads, tb, T_efect);
+**
+** Input:
+**
+**      y       (Tx1)-vector of endogenous time series
+**      x       (Txk)-matrix of stochastic regressors
+**      model    =  0 no deterministic regressors
+**               =  1 for a constant
+**               =  2 for a time trend
+**               =  3 for a constant + level shift
+**               =  4 for a constant + trend + level shift
+**               =  5 for a constant + trend + level shift + slope shift
+**      klags   scalar,  number of lags
+**      kleads  scalar,  number of leads
+**      tb      time of the break,  or zero if it is no break
+**      T_efect Number of effective observations for the BIC computation
+**
+** Output:
+**
+**      _beta    (kx1)-vector of estimated parameters
+**
+**  (c) 2004 Josep Lluís Carrion-i-Silvestre
+**
+**  Last modification: May 20th,  2004
+*/
+
+
+proc(4)  =  DOLS(y, x, model, klags, kleads, tb, T_efect);
+    
+    local t,  streg,  d_streg,  i,  lags,  d_streg_r,  leads,  ll,  xreg,  _beta,  bic,  deter,  xdu,  e;
+    
+    t = rows(y);
+    
+    streg = x;
+    d_streg = streg[2:t, .]-streg[1:t-1, .];
+    
+    i = 1;
+    do until i>klags;
+        d_streg = d_streg~lagn(streg[2:t, .]-streg[1:t-1, .], i);
+        i = i+1;
+    endo;
+    
+    d_streg_r = rev(streg[2:t, .]-streg[1:t-1, .]);
+    
+    i = 1;
+    do until i>kleads;
+        d_streg_r = d_streg_r~lagn(rev(streg[2:t, .]-streg[1:t-1, .]), i);
+        i = i+1;
+    endo;
+    
+    if (klags ne 0) and (kleads ne 0);
+        lags = d_streg;
+        leads = rev(d_streg_r[., cols(streg)+1:cols(d_streg_r)]);
+        ll = trimr(lags~leads, klags, kleads);
+    elseif (klags ne 0) and (kleads ==  0);
+        lags = d_streg;
+        ll = trimr(lags, klags, 0);
+    elseif (klags ==  0) and (kleads ne 0);
+        lags = d_streg;
+        leads = rev(d_streg_r[., cols(streg)+1:cols(d_streg_r)]);
+        ll = trimr(lags~leads, 0, kleads);
+    elseif (klags ==  0) and (kleads ==  0);
+        lags = d_streg;
+        ll = lags;
+    endif;
+    
+    if model ==  0;
+        xreg = streg[klags+2:T-kleads, .]~ll;
+    else;
+        deter = determi(model, t, tb);
+        xreg = deter[klags+2:T-kleads, .]~streg[klags+2:T-kleads, .]~ll;
+    endif;
+    
+    _beta = y[klags+2:T-kleads, 1]/xreg;
+    e = y[klags+2:T-kleads, 1]-xreg*_beta;
+    
+    bic = ln(e'e/(rows(xreg)-cols(xreg)))+cols(xreg)*ln(T_efect)/T_efect;
+    
+    retp(_beta, e, xreg*_beta, bic);
+    
+endp;
+
+
+
+
+/*
+** Procedure DETERMI
+**
+** Defines the deterministic components.
+**
+**
+*/
+
+proc(1)  =  determi(model, t, tb);
+    
+    local du,  dt,  xt;
+    
+    if model[1] ==  1; @ Constant @
+        xt  =  ones(t, 1);
+    elseif model[1] ==  2; @ Time trend @
+        xt  =  ones(t, 1)~seqa(1, 1, t);
+    elseif model[1] ==  3; @ Model An @
+        du = zeros(tb, 1)|ones(t-tb, 1);
+        xt  =  ones(t, 1)~du;
+    elseif model[1] ==  4; @ Model A @
+        du = zeros(tb, 1)|ones(t-tb, 1);
+        xt  =  ones(t, 1)~du~seqa(1, 1, t);
+    elseif model[1] ==  5; @ Model C @
+        du = zeros(tb, 1)|ones(t-tb, 1);
+        dt = zeros(tb, 1)|seqa(1, 1, t-tb);
+        xt  =  ones(t, 1)~du~seqa(1, 1, t)~dt;
+    else;
+        errorlog("ERROR: Select a suitable deterministic specification");
+        stop;
+    endif;
+    
+    retp(xt);
+endp;
+
+
+
+
+/*
+** ADF cointegration residuals test
+**
+*/
+
+proc(3) = ADFRC(res, method, p_max);
+    
+    local T,  res1,  D_res,  j,  temp,  i,  _beta,  err,  s2,  var_b,  t_sig,  p,  t_adf,  rho_adf;
+    
+    T  =  rows(res);
+    
+    res1 = lag(res);
+    d_res = res-res1;
+    
+    if method ==  0; @ Manual @
+        
+        temp = d_res~res1;
+        
+        i = 1;
+        do until i>p_max;
+            temp = temp~lagn(D_res, i);
+            i = i+1;
+        endo;
+        
+        temp = trimr(temp, p_max+1, 0);
+        _beta = temp[., 1]/temp[., 2:cols(temp)];
+        err = temp[., 1]-temp[., 2:cols(temp)]*_beta;
+        s2 = err'err/(T-(cols(temp)-1));
+        var_b = s2*invpd(temp[., 2:cols(temp)]'temp[., 2:cols(temp)]);
+        
+        t_adf = _beta[1]/sqrt(var_b[1, 1]); @ ADF Cointegration Residual test @
+        
+        p = p_max;
+        
+        if p ==  0;
+            rho_adf = T*_beta[1];
+        else;
+            rho_adf = T*_beta[1]@/(1-sumc(_beta[2:rows(_beta)]))@;
+        endif;
+        
+        
+    elseif method ==  1; @ Automatic @
+        j = p_max;
+        do until j<0;
+            
+            temp = d_res~res1;
+            
+            i = 1;
+            do until i>j;
+                temp = temp~lagn(D_res, i);
+                i = i+1;
+            endo;
+            
+            temp = trimr(temp, j+1, 0);
+            _beta = temp[., 1]/temp[., 2:cols(temp)];
+            err = temp[., 1]-temp[., 2:cols(temp)]*_beta;
+            s2 = err'err/(T-(cols(temp)-1));
+            var_b = s2*invpd(temp[., 2:cols(temp)]'temp[., 2:cols(temp)]);
+            t_sig = _beta[rows(_beta)]/sqrt(var_b[rows(_beta), rows(_beta)]); @ The individual significance test for the last autoregressive term @
+            
+            if j == 0;
+                t_adf = _beta[1]/sqrt(var_b[1, 1]); @ ADF Cointegration Residual test @
+                rho_adf = T*_beta[1];
+                p = j; @ Order of the autoregressive correction @
+                j = -1; @ To exit the loop @
+            elseif j>0;
+                if abs(t_sig) < 1.645; @ if the last lag is non-significant at the 10% level of significance using a N(0, 1) @
+                    j = j-1;
+                else;
+                    t_adf = _beta[1]/sqrt(var_b[1, 1]); @ ADF Cointegration Residual test @
+                    rho_adf = T*_beta[1]@/(1-sumc(_beta[2:rows(_beta)]))@;
+                    p = j; @ Order of the autoregressive correction @
+                    j = -1; @ To exit the loop @
+                endif;
+            endif;
+            
+        endo;
+        
+    endif;
+    
+    retp(t_adf, rho_adf, p);
+    
+endp;
+
+
+
+
+/*
+** Procedure to carry out the bootstraping for each individual cointegrating regression.
+**
+** We use the Sieve Bootstrap procedure described in "Bootstrapping Cointegrating Regressions" by
+** Y. Chang,  J. Park and K. Song (2004).
+**
+** Sintaxis:
+**
+**      {y_boot, x_boot}  =  boot_Chang(y, x, model, tb, boot_order);
+**
+**  Input:
+**
+**      y          (Tx1)-matrix of the endogeneous,
+**
+**      x           (Txk)- matrix of regressors,
+**
+**      model        =  0 for the model that does not include deterministics,
+**                   =  1 for the model that includes a constant,
+**                   =  2 for the model that includes a time trend.
+**
+**      Tb          Scalar,  denotes the time of the break when required.
+**
+**      Boot_order  (NBx1)-vector containing the order in which the observations are to be bootstrapped.
+**
+**  Outupu:
+**
+**      y_boot      (Tx1)-matrix of bootstrapped endogeneous variable,
+**
+**      x_boot      (Txk)- matrix of bootstrapped regressors.
+**
+*/
+
+proc(2)  =  boot_Chang(y, x, model, tb, boot_order);
+    
+    local T,  N,  _beta_original,  e_hat,  p,  z,  bic,  Dx,  W,  p_max,  m_bic,  i,  w_lag,  j,  temp,  m_res,  _beta;
+    local det_omega,  l,  m__beta,  temp_res,  m_res_boot,  temp_boot,  jj,  x_boot,  y_boot;
+    
+    T = rows(y);
+    N = cols(y);
+    
+    if model[1] ==  0;
+        {_beta_original,  e_hat,  p}  =  olsqr2(y, x);
+    elseif (model[1] ==  1) or (model[1] ==  2);
+        z = determi(model[1], t, 0); @ Deterministic regressors. Model[2] = 0 if there is no break @
+        {_beta_original,  e_hat,  p}  =  olsqr2(y, x~z); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+    elseif (model[1] ==  3) or (model[1] ==  4) or (model[1] ==  5); @ Models with shift in the deterministics @
+        z = determi(model[1], t, tb[1]); @ Deterministic regressors. Model[2]  =  j because there is a break @
+        {_beta_original,  e_hat,  p}  =  olsqr2(y, x~z); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+    elseif (model[1] ==  6); @ Models with shift in the level and in the cointegrating vector @
+        z = determi(3, t, tb[2]); @ Deterministic regressors. Model[1]  =  3 for the level shift; Model[2]  =  j because there is a break @
+        {_beta_original,  e_hat,  p}  =  olsqr2(y, z~x~x.*z[., 2]); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+    endif;
+    
+    Dx = x[2:T, .]-x[1:t-1, .]; @ Difference the regressors @
+    w = (e_hat[2:T, .]-e_hat[1:T-1, .])~Dx; @ Residuals @
+    
+    p_max = int(sqrt(T)); @ Maximum order for the VAR model @
+    m_bic = zeros(p_max, 1); @ Matrix to store the BIC criteria @
+    
+    i = 1;
+    do until i>p_max;
+        w_lag = lag(w); @ First lagged regressors @
+        j = 2;
+        do until j>i;
+            w_lag = w_lag~lagn(w, j);
+            j = j+1;
+        endo;
+        temp = trimr(w~w_lag, i, 0);
+        m_res = zeros(rows(temp), cols(w)); @ Matrix to store the residuals @
+        
+        j = 1;
+        do until j>cols(w); @ Loop to estimate each equation in the VAR system by OLS @
+            _beta = temp[., j]/temp[., cols(w)+1:cols(temp)]; @ Estimate the parameters by OLS @
+            m_res[., j] = temp[., j]-temp[., cols(w)+1:cols(temp)]*_beta; @ Compute the OLS-residuals @
+            j = j+1;
+        endo;
+        Det_omega  =  (1/(T-cols(_beta)))*det(m_res*m_res'); @ Determinant of the matrix of covariances @
+        l  =  (-T/2)*(cols(w)*(1+ln(2*pi))+ln(det_omega)); @ Log-likelihood @
+        m_BIC[i]  =  -2*l/T + (cols(w)^2*rows(_beta))*ln(T)/T; @ BIC information criterion @
+        i = i+1;
+    endo;
+    
+    p  =  minindc(m_bic); @ Order of the VAR model @
+    
+    w_lag = lag(w); @ First lagged regressors @
+    j = 2;
+    do until j>p;
+        w_lag = w_lag~lagn(w, j);
+        j = j+1;
+    endo;
+    
+    temp = trimr(w~w_lag, p, 0);
+    m__beta = zeros(cols(temp)-cols(w), cols(w)); @ Matrix to store the autoregressive coefficients @
+    m_res = zeros(rows(temp), cols(w)); @ Matrix to store the residuals @
+    j = 1;
+    do until j>cols(w); @ Loop to estimate each equation in the VAR system by OLS @
+        m__beta[., j] = temp[., j]/temp[., cols(w)+1:cols(temp)]; @ Estimate the parameters by OLS @
+        m_res[., j] = temp[., j]-temp[., cols(w)+1:cols(temp)]*m__beta[., j]; @ Compute the OLS-residuals @
+        j = j+1;
+    endo;
+    
+    m_res = m_res-meanc(m_res)'; @ Centering the fitted residuals @
+    
+    m_res_boot = zeros(rows(boot_order), cols(m_res)); @ Matrix of bootstrapped residuals @
+    
+    j = 1;
+    do until j>rows(boot_order); @ Bootstrapping the residuals @
+        m_res_boot[j, .] = m_res[boot_order[j]-p_max, .];
+        j = j+1;
+    endo;
+    
+    temp_boot = temp|zeros(rows(boot_order)-rows(temp), cols(temp)); @ Matrix to store the bootstrapped disturbance terms @
+    
+    j = 1;
+    do until j>cols(w);
+        jj = 2;
+        do until jj>rows(temp_boot);
+            temp_boot[jj, j] = temp_boot[jj-1, cols(w)+1:cols(temp_boot)]*m__beta[., j]+m_res_boot[jj, j];
+            jj = jj+1;
+        endo;
+        j = j+1;
+    endo;
+    
+    x_boot = cumsumc(x[1, .]|temp_boot[1:rows(x)-1, 2:cols(w)]); @ Bootstrapped exogenous regressors @
+    e_hat = cumsumc(e_hat[1, .]|temp_boot[1:rows(x)-1, 1]); @ Bootstrapped disturbance term @
+    
+    if model[1] ==  0;
+        y_boot  =  x_boot*_beta_original+e_hat;
+    elseif (model[1] ==  1) or (model[1] ==  2);
+        z = determi(model[1], t, 0); @ Deterministic regressors. Model[2] = 0 if there is no break @
+        y_boot  =  (x_boot~z)*_beta_original+e_hat;
+    elseif (model[1] ==  3) or (model[1] ==  4) or (model[1] ==  5); @ Models with shift in the deterministics @
+        z = determi(model[1], t, tb[1]); @ Deterministic regressors. Model[2]  =  j because there is a break @
+        y_boot  =  (x_boot~z)*_beta_original+e_hat;
+    elseif (model[1] ==  6); @ Models with shift in the level and in the cointegrating vector @
+        z = determi(3, t, tb[2]); @ Deterministic regressors. Model[1]  =  3 for the level shift; Model[2]  =  j because there is a break @
+        y_boot  =  (z~x_boot~x_boot.*z[., 2])*_beta_original+e_hat;
+    endif;
+    
+    retp(y_boot, x_boot);
+    
+endp;
+
+
+
+/*
+** Procedure to generate the order of the bootstrapped residuals
+**
+*/
+
+proc(1) = boot_order(T, T_boot, p_max);
+    retp(int((1+p_max)+(T-1-p_max)*rndu(T_boot, 1)));
+endp;
+
+
+
+
+/*
+** Procedure to bootstrap the cointegrating relationships for
+** the panel data set.
+**
+*/
+
+proc(1) = panel_boot_Chang(y, x, method, model, p_max, estima, tb, T_boot, replications);
+    
+    local T,  N,  k,  test_t,  test_rho,  i_boot,  boot_ord,  i,  y_i,  x_i,  j,  y_boot_i,  x_boot_i;
+    local m_adf,  t_adf,  m_err,  rho_adf,  z,  t_adf_min,  rho_adf_min,  p_min,  tbe,  Emeanvar;
+    local b,  e_hat,  p,  bic;
+    local mean_t, var_t, mean_rho, var_rho;
+    
+    T = rows(y); @ Sample size @
+    N = cols(y); @ Number of individuals @
+    k = cols(x)/N; @ Number of regressors @
+    
+    test_t = 0; @ To store the pseudo t-ratio statistic @
+    test_rho = 0; @ To store the normalised bias statistic @
+    
+    i_boot = 1;
+    do until i_boot>replications;
+        
+        boot_ord = boot_order(T, T_boot, int(sqrt(T))); @ Order in which the observations have to be sorted @
+        
+        m_adf = zeros(N, 2); @ Matrix to store the individual t_ADF tests and the order of the autoregressive correction @
+        
+        i = 1;
+        do until i>N;
+            
+            y_i = y[., i]; @ Endogenous variable @
+            x_i  =  x[., i]; @ First exogenous variable @
+            
+            if k > 1; @ Select the additional stochastic regressors if necessary @
+                j  =  2;
+                do until j>k;
+                    x_i = x_i~x[., i+(j-1)*N]; @ Additional regressors @
+                    j = j+1;
+                endo;
+            endif;
+            
+            if (model[1] ==  0) or (model[1] ==  1) or (model[1] ==  2);
+                {y_boot_i, x_boot_i}  =  boot_Chang(y_i, x_i, model, tb, boot_ord);
+            else;
+                {y_boot_i, x_boot_i}  =  boot_Chang(y_i, x_i, model, tb[i, .], boot_ord);
+            endif;
+            
+            if model[1] == 0;
+                
+                {b,  e_hat,  p,  bic}  =  coint_estima(y_boot_i, x_boot_i, estima[1], model[1], estima[2], estima[3], 0);
+                {t_adf, rho_adf, p}  =  ADFRC(e_hat, method, p_max); @ ADF Cointegration test @
+                
+            elseif (model[1] ==  1) or (model[1] ==  2);
+                
+                {b,  e_hat,  p,  bic}  =  coint_estima(y_boot_i, x_boot_i, estima[1], model[1], estima[2], estima[3], 0);
+                {t_adf, rho_adf, p}  =  ADFRC(e_hat, method, p_max); @ ADF Cointegration test @
+                
+            elseif (model[1] ==  3) or (model[1] ==  4) or (model[1] ==  5); @ Models with shift in the deterministics @
+                
+                t_adf_min = 1e6;
+                rho_adf_min = 1e6;
+                p_min = 1e6;
+                
+                j = 2;
+                do until j>t-2;
+                    z = determi(model[1], t, j); @ Deterministic regressors. Model[2]  =  j because there is a break @
+                    {b,  e_hat,  p}  =  olsqr2(y_boot_i, x_boot_i~z); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+                    {t_adf, rho_adf, p}  =  ADFRC(e_hat, method, p_max); @ ADF Cointegration test @
+                    
+                    if t_adf<t_adf_min;
+                        t_adf_min = t_adf;
+                        p_min = p;
+                    endif;
+                    
+                    if rho_adf<rho_adf_min;
+                        rho_adf_min = rho_adf;
+                        p_min = p;
+                    endif;
+                    
+                    j = j+1;
+                endo;
+                
+                t_adf = t_adf_min;
+                p = p_min;
+                
+                rho_adf = rho_adf_min;
+                
+                
+            elseif (model[1] ==  6); @ Level shift and coint. vector shift @
+                
+                t_adf_min = 1e6;
+                rho_adf_min = 1e6;
+                p_min = 1e6;
+                
+                j = 2;
+                do until j>t-2;
+                    z = determi(3, t, j); @ Deterministic regressors. Model[1]  =  3 for the level shift; Model[2]  =  j because there is a break @
+                    {b,  e_hat,  p}  =  olsqr2(y_boot_i, z~x_boot_i~x_boot_i.*z[., 2]); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+                    {t_adf, rho_adf, p}  =  ADFRC(e_hat, method, p_max); @ ADF Cointegration test @
+                    
+                    if t_adf<t_adf_min;
+                        t_adf_min = t_adf;
+                        p_min = p;
+                    endif;
+                    
+                    
+                    if rho_adf<rho_adf_min;
+                        rho_adf_min = rho_adf;
+                        p_min = p;
+                    endif;
+                    
+                    
+                    
+                    j = j+1;
+                endo;
+                
+                t_adf = t_adf_min;
+                p = p_min;
+                
+                rho_adf = rho_adf_min;
+                
+            endif;
+            
+            m_adf[i, .] = t_adf~rho_adf;
+            
+            i = i+1;
+            
+        endo;
+        
+        {mean_t, var_t, mean_rho, var_rho} = rs_mean_var(model[1], k, p_max, T);
+        
+        test_t  =  (test_t|((N^(-1/2)*sumc(m_adf[., 1]))-(mean_t)*sqrt(N))/sqrt(var_t));
+        test_rho  =  test_rho|(((N^(-1/2)*sumc(m_adf[., 2]))-(mean_rho)*sqrt(N))/sqrt(var_rho));
+        
+        i_boot  =  i_boot+1;
+        
+    endo;
+    
+    retp(test_t[2:rows(test_t)]~test_rho[2:rows(test_rho)]);
+    
+endp;
+
+
+
+
+
+/*
+** Procedure to carry out the bootstraping
+**
+** Sintaxis:
+**
+**      cv_boot  =  boot_ADF(errors, replications);
+**
+**  Input:
+**
+**      errors          (TxN)-matrix containing the errors of the ADF-type regression equation,
+**      replications    Scalar,  denotes the number of replications for the bootstrap.
+**
+**  Output:
+**
+**      test_boot       Scalar,  sum of the individual ADF pseudo t-ratio statistics
+**
+*/
+
+proc(1)  =  boot_ADF(errors, m_p, replications);
+    
+    local T,  N,  temp,  probs,  q,  t_adf,  rho_adf,  p,  err,  _beta,  i,  T_boot,  test_boot,  m_adf;
+    local Dy,  m_res,  m__beta,  m_res_boot,  j,  yboot,  jj,  x;
+    
+    T = rows(errors);
+    N = cols(errors);
+    
+    m_res = zeros(T, N); @ Matrix to store the residuals of the ADF equation under the null hypothesis @
+    
+    if maxc(m_p)>0;
+        m__beta = zeros(maxc(m_p), N); @ Matrix to store the coefficients of the ADF equation @
+    endif;
+    
+    i = 1;
+    do until i>N;
+        
+        if m_p[i] > 0;
+            Dy = errors[., i]-lag(errors[., i]);
+            temp = Dy;
+            
+            j = 1;
+            do until j>m_p[i];
+                temp = temp~lagn(Dy, j);
+                j = j+1;
+            endo;
+            
+            temp = trimr(temp, m_p[i]+1, 0);
+            m__beta[1:m_p[i], i]  =  temp[., 1]/temp[., 2:cols(temp)];
+            m_res[m_p[i]+2:T, i]  =  temp[., 1] - temp[., 2:cols(temp)]*m__beta[1:m_p[i], i];
+        else;
+            m_res[2:T, i]  =  errors[2:T, i]-errors[1:T-1, i]; @ Just compute the first difference of the data @
+        endif;
+        
+        i = i+1;
+    endo;
+    
+    
+    m_res = m_res-meanc(m_res)'; @ Center the residuals @
+    
+    
+    @++++++++++++++++++++++++++++@
+    @ Bootstrap part of the code @
+    @++++++++++++++++++++++++++++@
+    
+    T_boot = T-maxc(m_p)-1; @ Effective sample size to do the bootstrap @
+    test_boot = zeros(replications, 1); @ Matrix to store the bootstraped test @
+    
+    m_adf = zeros(n, 1);
+    
+    i = 1;
+    do until i>replications;
+        
+        m_res_boot = zeros(T_boot+30, N);
+        
+        j = 1;
+        do until j>T_boot+30;
+            temp = int(1+(rows(m_res)-1)*rndu(1, 1));
+            m_res_boot[j, .] = m_res[temp, .];
+            j = j+1;
+        endo;
+        
+        yboot  =  m_res_boot;
+        
+        j = 1;
+        do until j>N;
+            jj = m_p[j]+1; @ Order of the autoregressive correction @
+            do until jj>rows(yboot);
+                if m_p[j]>0;
+                    
+                    yboot[jj, j] = rev(m__beta[1:m_p[j], j])'*yboot[jj-m_p[j]:jj-1, j]+m_res_boot[jj, j];
+                    
+                elseif m_p[j] ==  0;
+                    
+                    yboot[jj, j] = m_res_boot[jj, j];
+                    
+                endif;
+                jj = jj+1;
+            endo;
+            j = j+1;
+        endo;
+        
+        x = cumsumc(yboot);
+        yboot = x[31:rows(x), .];
+        
+        j = 1;
+        do until j>N;
+            {t_adf, rho_adf, p}  =  ADFRC(yboot[., j], 0, m_p[j]); @ ADF Cointegration test @
+            m_adf[j] = t_adf;
+            j = j+1;
+        endo;
+        
+        test_boot[i]  =  sumc(m_adf); @ This is not the test statistic,  because we need to carry out the standarisation!! @
+        
+        i = i+1;
+    endo;
+    
+    retp(test_boot);
+    
+endp;
+
+
+
+
+
+proc(4) = rs_mean_var(model, m, k, T);
+    
+    local reg,  coef,  temp,  mean_t, var_t, mean_rho, var_rho;
+    
+    reg = 1|1/t|1/t^2|1/t^3|m|m/t|m/t^2|m/t^3|m^2|m^2/t|m^2/t^2;
+    
+    if model == 0;
+        
+        temp = {  -1.389 0.781 -6.836 26.782,
+            -1.992 0.649 -9.889 41.943,
+            -2.440 0.600 -13.865 57.801,
+            -2.819 0.567 -17.834 72.097,
+            -3.151 0.559 -21.805 88.611,
+            -3.450 0.544 -25.750 103.371,
+            -3.723 0.530 -29.627 117.059};
+        
+        mean_t  =  temp[m, 1];
+        var_t  =  temp[m, 2];
+        mean_rho  =  temp[m, 3];
+        var_rho  =  temp[m, 4];
+        goto theend;
+        
+    elseif model ==  1;
+        
+        temp = {  -2.025 0.660 -9.049 35.976,
+            -2.453 0.618 -12.938 51.490,
+            -2.827 0.585 -16.888 67.123,
+            -3.157 0.560 -20.841 81.835,
+            -3.452 0.553 -24.775 98.278,
+            -3.726 0.542 -28.720 113.131,
+            -3.976 0.525 -32.538 126.059};
+        
+        mean_t  =  temp[m, 1];
+        var_t  =  temp[m, 2];
+        mean_rho  =  temp[m, 3];
+        var_rho  =  temp[m, 4];
+        goto theend;
+        
+    elseif model ==  2;
+        
+        temp = {  -2.528 0.561 -13.649 50.907,
+            -2.872 0.555 -17.359 66.387,
+            -3.179 0.548 -21.116 81.832,
+            -3.464 0.543 -24.930 97.362,
+            -3.737 0.538 -28.850 113.145,
+            -3.986 0.530 -32.716 127.989,
+            -4.217 0.518 -36.494 140.756};
+        
+        mean_t  =  temp[m, 1];
+        var_t  =  temp[m, 2];
+        mean_rho  =  temp[m, 3];
+        var_rho  =  temp[m, 4];
+        goto theend;
+        
+    elseif model ==  3;
+        
+        coef  =  {-3.127005	-8.832502	179.3338	-1990.403	-0.429461	0	-60.80721	0	0.016125	-0.235906	5.935305,
+            -19.1961	121.763	-2571.386	58983.27	-6.238452	124.4677	-1312.53	0	0.111728	3.08351	-51.73588,
+            0.389926	5.063885	0	0	-0.00489	1.000412	34.59032	0	0	0	0,
+            60.64848	-1226.67	0	196196.7	16.53049	-1325.654	42679.5	-532567.3	-0.361639	0	225.0782,
+            -3.212593	4.102298	-428.6009	6757.605	-0.414432	4.400376	-26.55979	0	0.015142	0	-2.238748,
+            -19.67157	91.64573	-6704.974	103243.4	-5.961325	17.45214	438.1621	0	0.080497	4.172824	-71.78726,
+            0.414942	0.966898	85.47789	0	-0.018312	1.579429	0	0	0.001565	-0.084668	0,
+            62.30892	-104.6851	0	0	15.19595	-172.8493	0	0	-0.146932	-9.381916	0,
+            -3.195971	-2.137581	0	-2085.401	-0.418954	15.19619	-348.3852	4192.348	0.016187	-0.289305	0,
+            -19.09008	-251.0327	-2084.949	0	-5.960304	-102.3198	2139.019	0	0.068329	1.362463	0,
+            0.41127	0	89.80034	2785.821	-0.017576	1.281792	0	0	0.001301	-0.0692	0,
+            61.07599	2333.282	14804.35	0	14.49059	1468.171	-14669.95	0	0	0	0,
+            -3.218494	-34.86989	737.6215	-11377.84	-0.441522	1.627722	0	0	0.016818	-0.114482	0,
+            -19.63821	-97.19275	-3103.602	0	-6.026779	-68.7902	1511.876	0	0.08127	0.96745	0,
+            0.409665	10.77722	-284.4293	4332.145	-0.004106	-2.035828	55.88736	0	0	0.164698	0,
+            56.82286	2079.863	0	0	18.14038	0	28710.63	0	-0.748437	205.976	-5962.404};
+        
+    elseif model ==  4;
+        
+        coef  =  {-3.684175	-9.439213	28.30835	0	-0.34052	0	-51.3927	0	0.009816	-0.228421	4.324763,
+            -26.67928	144.1716	3575.522	-72734.42	-5.624682	180.54	-4444.318	48906.87	0.066508	1.20814	0,
+            0.339334	6.104029	0	1029.447	0.00344	0.902233	39.62858	0	0	0	0,
+            67.79987	-1885.589	16698.79	0	17.64493	-1543.665	53149.58	-663605.3	-0.390175	6.859198	0,
+            -3.734746	1.953497	-286.0321	5567.945	-0.333905	6.005906	-59.45768	0	0.009739	-0.137648	0,
+            -26.72405	-42.72512	421.2825	0	-5.411252	56.21182	-245.555	0	0.049681	0.613569	0,
+            0.336309	2.873483	58.52038	0	0.004834	1.367763	-30.87943	612.8611	-0.000619	0	0,
+            69.4818	0	-18212.26	275990.6	15.91519	-236.0097	0	0	-0.195211	0	0,
+            -3.758	9.946924	-102.8882	0	-0.323801	14.12365	-368.1153	4228.759	0.00951	-0.172054	0,
+            -26.3602	-577.9495	8408.465	-70550.62	-5.370955	-70.90449	1714.215	0	0.028575	0	0,
+            0.326813	1.92574	0	5474.382	0.008407	0.595785	0	0	-0.000871	0	0,
+            70.53678	3688.82	-111525	2935591	14.35552	1834.07	-25876.53	0	0	0	0,
+            -3.778071	-42.35922	1018.228	-13147.4	-0.350767	3.225388	-36.26546	0	0.010208	-0.161382	0,
+            -26.65389	-392.7254	4124.832	0	-5.62762	0	0	0	0.063859	-5.217629	140.9798,
+            0.371798	1.675824	97.64532	0	0.004744	0	0	0	-0.000519	0	5.980348,
+            71.03442	1730.194	40207.55	0	13.14511	1293.969	-18644.32	0	0	48.06126	0};
+        
+    elseif model ==  5;
+        
+        
+        coef  =  {-3.971484	-8.978932	-49.32578	0	-0.314403	-2.059587	0	0	0.007572	0.037609	-3.392553,
+            -31.76745	442.2088	-10829.74	164392.7	-5.333638	124.5164	-1139.025	0	0.038521	5.520559	-128.8668,
+            0.35907	7.471634	59.68141	0	0	0.851527	42.03004	0	0	0	0,
+            91.1075	-3645.426	75512.06	-777252.4	14.51361	-1361.209	47092.27	-562391.3	-0.215552	0	0,
+            -4.010995	5.695002	-543.1101	8627.961	-0.316719	5.919777	-53.69197	0	0.008872	-0.147158	0,
+            -31.14126	25.55021	-4224.155	84886.75	-5.475797	63.48494	-245.2986	0	0.053924	0	0,
+            0.352999	6.455829	0	0	0.005566	-1.008895	81.56629	-631.8805	-0.000825	0.181125	-5.952655,
+            89.83085	-173.3446	-6455.393	0	14.7752	-274.9894	0	0	-0.154917	0	0,
+            -4.012633	10.74949	-322.2809	0	-0.30658	15.5097	-394.685	4719.719	0.008374	-0.270432	0,
+            -30.64488	-722.6513	10502.56	-173970.8	-5.325258	-75.5224	1780.818	0	0.014409	0	0,
+            0.367058	0	139.0598	4467.837	-0.004171	1.05232	-11.11668	0	0	0	0,
+            89.60917	6021.446	-119796.1	2779171	13.94369	1272.166	0	0	0	70.6926	-2726.643,
+            -4.060951	-43.94115	921.3641	-13082.02	-0.335186	3.616362	-30.1743	0	0.009425	-0.193548	0,
+            -31.0332	-465.5912	1330.639	0	-5.637196	0	0	0	0.059095	-6.066661	146.45,
+            0.389311	5.779435	-225.8949	5584.734	0	-0.798288	56.86453	0	-0.000348	0.09347	0,
+            72.25134	7427.681	-177465.4	2808044	19.72147	0	37740.3	0	-0.737092	190.91	-5491.499};
+        
+        
+    elseif model ==  6;
+        
+        coef  =  {-3.221209	0	-110.0602	0	-0.627605	-2.236262	0	0	0.023317	-0.187939	-3.325199,
+            -19.84519	318.5527	-16385.62	307418.8	-10.04663	219.6937	-1980.416	0	0.136377	12.3556	-290.9512,
+            0.430473	3.045703	102.4327	0	0	3.30662	0	0	-0.000195	-0.165474	11.95521,
+            60.88436	0	-87968.11	1874059	35.77592	-3225.963	121345.6	-1725484	-1.033453	0   797.5297,
+            -3.234878	0	-76.87933	0	-0.623735	13.89093	-374.7065	4741.349	0.023907	-0.304118	0,
+            -19.24639	66.53052	-6527.479	120101.1	-9.879742	135.5474	-2851.772	32282.1	0.103576	2.734358	0,
+            0.429045	1.626415	100.5481	0	-0.001862	2.983103	-45.19919	0	0	-0.199239	6.356175,
+            66.59106	-1025.367	30787.53	0	29.48215	438.9868	-24349.6	0	0	-138.4158	3434.739,
+            -3.269375	8.327524	-527.9737	6371.796	-0.589991	24.26516	-666.318	8318.551	0.023217	-0.479487	0,
+            -19.3328	-180.3182	-3147.907	0	-9.212951	-136.2072	2432.973	0	0	0	81.9377,
+            0.435469	0	0	4215.836	-0.003412	1.582429	9.136809	0	0	-0.09199	0,
+            58.96902	3904.387	-154668.9	3727902	27.29737	3537.474	-47364.92	0	0.825995	0	0,
+            -3.285953	-26.17637	166.7276	0	-0.649138	3.806045	-45.1426	0	0.024948	-0.227242	0,
+            -19.51936	-101.8315	-2334.409	0	-9.780451	-26.88279	0	0	0.085839	-8.472919	292.5595,
+            0.516623	1.918887	0	0	-0.019882	0	72.5594	0	0.000977	0.17572	0,
+            70.4525	0	44801.21	0	26.00285	2162.096	0	0	0	275.7489	-8513.873};
+        
+    elseif model ==  7;
+        
+        coef  =  {-3.780227	-6.974115	0	0	-0.544013	-0.867805	-43.71748	0	0.017723	-0.305937	0,
+            -27.85051	242.9423	0	-42063.93	-9.614703	322.6078	-8330.38	113929.5	0.09717	11.10558	-273.6371,
+            0.364029	6.564409	0	0	0.007985	2.617351	41.63805	0	0	-0.160593	10.16573,
+            74.28565	-2146.293	20055.64	0	34.67894	-3212.648	115262.4	-1488387	-1.053172	24.40789	0,
+            -3.825234	4.259965	-98.23133	0	-0.524239	14.20605	-434.6783	5633.642	0.016654	-0.235787	0,
+            -27.92233	97.29859	-5411.362	88658.21	-9.170681	143.5117	-3425.206	49471.7	0.046812	5.337131	-74.92922,
+            0.380406	0	94.12258	0	0.003512	2.825494	0	0	0	-0.13596	0,
+            78.16007	-1049.361	11495.16	0	29.3486	0	-7443.609	0	0	-86.62969	1363.246,
+            -3.828066	12.9977	-182.8824	0	-0.495902	25.8344	-842.6431	9999.87	0.016782	-0.573505	9.204261,
+            -27.8577	-253.5389	-13556.49	359446.7	-8.766921	-154.4158	6727.948	-124097.4	-5.135996	247.0733	0,
+            0.343005	1.635887	-88.33209	7587.446	0.016341	1.580894	0	0	-0.001422	-0.082944	0,
+            60.51307	6899.273	-322583.2	5934887	32.94931	2404.486	0	0	0	187.5417	-7067.742,
+            -3.874972	-35.04735	681.6646	-8374.721	-0.548788	4.830355	-74.57737	0	0.017686	-0.234741	0,
+            -27.69421	-296.3445	1996.116	0	-9.262266	-9.079033	-540.4155	0	0.047611	-8.318182	283.2092,
+            0.398836	0	119.6319	0	0.010551	0.937337	0	0	-0.001051	0	13.8459,
+            109.9767	-8193.521	607421	-9915995	7.77242	6841.871	-256154.3	3915350	1.661079	0	0};
+        
+    elseif model ==  8;
+        
+        coef  =  {-3.967894	-8.230459	-83.45714	0	-0.504895	-1.767228	0	0	0.014184	-0.188808	-5.391661,
+            -30.48288	191.3219	4931.966	-123591.5	-9.373427	357.3916	-9875.101	131909.7	0.071811	9.475722	-222.1937,
+            0.366072	10.85459	-266.0207	7384.621	0.007069	3.982481	0	0	0	-0.325281	15.91603,
+            87.34218	-2699.1	28358.7	0	33.82655	-3213.574	118816.1	-1614095	-0.88784	0    730.025,
+            -4.016437	6.24103	-493.4824	7199.83	-0.487963	13.46902	-326.6129	3497.908	0.013934	-0.272473	0,
+            -31.32227	156.0039	-11876.56	218847.8	-8.640022	106.7359	-744.4957	0	0	6.339919	-89.48118,
+            0.383451	2.625704	90.1441	0	0.010659	2.271385	0	0	-0.000851	-0.1207	1.485602,
+            91.35362	0	-40668.1	521643.9	29.63946	-281.7666	4060.874	0	0	-58.01997	0,
+            -4.025663	13.95125	-403.515	0	-0.450513	24.74918	-789.6541	10535.88	0.012408	-0.331097	0,
+            -31.25555	-408.1833	-10959.25	228140.6	-8.119507	-194.8264	8114.972	-121465.5	-0.077598	0	120.421,
+            0.377963	0.866546	0	6664.312	0.011114	1.508559	0	0	-0.001073	-0.073692	0,
+            71.17468	11057.17	-499199.5	10140177	29.81627	3570.033	-40673.95	0	0.753986	0	0,
+            -4.071288	-41.84613	938.0212	-14997.98	-0.509453	5.806471	-111.6918	1563.76	0.014027	-0.177652	-3.998746,
+            -31.40652	-243.5178	-12550.07	240521.8	-8.675493	-66.60072	3590.481	-69517.66	0	-7.490122	271.8859,
+            0.424104	0	147.0212	0	0.011233	0.857522	0	0	-0.001429	0	15.24547,
+            87.10326	5713.206	-286832.2	7973939	19.26897	4385.407	-58727.81	0	1.239207	0	0};
+        
+    else;
+        
+        errorlog("ERROR: Select the right specification");
+        stop;
+        
+    endif;
+    
+    if k ==  0; @ No lags @
+        coef  =  coef[1:4, .];
+    elseif k ==  2; @ Two lags @
+        coef  =  coef[5:8, .];
+    elseif k ==  5; @ Five lags @
+        coef  =  coef[9:12, .];
+    else; @ Automatic selection @
+        coef  =  coef[13:16, .];
+    endif;
+    
+    temp = coef*reg;
+    mean_t = temp[1];
+    mean_rho = temp[2];
+    var_t = temp[3];
+    var_rho = temp[4];
+    
+    theend:
+        
+        retp(mean_t, var_t, mean_rho, var_rho);
+endp;
+
+
+proc(2) = common_break_estima(y, x, model);
+
+    local T, N, k, i, mat_SSR_hat, y_i, x_i, z, b, e_hat, p, ssr_global, Tb_est; 
+
+    T = rows(y); @ Sample size @
+    N = cols(y); @ Number of individuals @
+    k = cols(x)/N; @ Number of regressors @
+
+    mat_SSR_hat=zeros(T-2-2+1,N); @ Matrix to store the individual OLS SSR @
+
+    i=1;
+    do until i>N; @ Compute the individual SSR @
+
+        y_i=y[.,i]; @ Endogenous variable @
+        x_i = x[.,i]; @ First exogenous variable @
+
+        if k > 1; @ Select the addtional stochastic regressors if necessary @
+            local j;
+            j = 2;
+            do until j>k;
+                x_i=x_i~x[.,i+(j-1)*N]; @ Additional regressors @
+                j=j+1;
+            endo;
+        endif;
+
+        j=2;
+        do until j>t-2;
+            z=determi(model[1],t,j); @ Deterministic regressors. Model[2] = j because there is a break @
+            {b, e_hat, p} = olsqr2(y_i,x_i~z); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+            mat_SSR_hat[j-1,i]=e_hat'e_hat;
+            j=j+1;
+        endo;
+    
+        i=i+1;
+    endo;
+
+    ssr_global=sumc(mat_SSR_hat'); @ We compute the global SSR @
+    Tb_est=minindc(ssr_global)+1; @ Estimated break point @
+
+    retp(ssr_global,Tb_est);
+endp;
+
+/*************************************************************************/
+/* THIS VERSION: 13/03/06                                               **/
+/* COMPUTE tbar(P) (AND tbar*(P)) STATISTICS IN IM, PESARAN, SHIN (2003)**/
+/* "Testing for unit roots in heterogeneous panels", Journal of         **/
+/*  Econometrics 115, 53-74.                                            **/
+/* For the truncated version, see Pesaran (2006),                       **/
+/* " A SIMPLE PANEL UNIT ROOT TEST UNDER CROSS SECTION DEPENDENCE"      **/
+/*  FEBRUARY 2006                                                       **/
+/* NOTE:                                                                **/
+/* Please report any problems you might have, to: ty228@econ.cam.ac.uk  **/
+/*                                                                      **/
+/* {tbarmat,adf_p_mat,adfs_p_mat,res_p_mat}=ips(var_mat,maxp,case);     **/
+/*                                                                      **/
+/* <<INPUTS>>                                                           **/
+/* var_mat (T x N) matrix                                               **/
+/* N            : number of cross section dimension                     **/
+/* T		: number of observations for i's                            **/
+/* maxp (more than or equal to zero) : maximum number of (ADF) lag order**/
+/*                                    eg. maxp=0: ADF==DF               **/
+/* case=1: no intercept nor trend                                       **/
+/* case=2: with intercept                                               **/
+/* case=3: with intercept and trend                                     **/
+/* <<OUTPUTS>>                                                          **/
+/* tbarmat: (maxp+1) x 2 matrix, first column reports                   **/
+/*          tbar(p) and second column reports tbar*(p)                  **/
+/*          for p=0,1,...,maxp in ascending order                       **/
+/*     -tbar(p) statistic is defined as simple average of               **/
+/*       adf(p)_i statistics                                            **/
+/*     -tbar*(p) statistic is defined as simple average of              **/
+/*       adf*(p)_i statistics, which is truncated version of adf(p)_i.  **/
+/*    Notes: For a discussion about the truncation, See Pesaran (2006), **/
+/*      " A Simple Panel Unit Root Test Under Cross Section Dependence" **/
+/*                                                                      **/
+/* adf_p_mat: a N x (maxp+1) matrix, reports all ADF(p)_i statistics    **/
+/* adfs_p_mat: a N x (maxp+1) matrix, reports all ADF*(p)_i statistics  **/
+/* res_p_mat: a (maxp+1) set of						                    **/
+/*		T-(maxp+1) x N matrix of residuals of  ADF(p)_i regressions	    **/
+/*              concatenated vertically, from the top p=0,p=1,,,p=maxp  **/
+/*                                                                      **/
+/* IPS is sqrt(N)*(TBAR - E(TBAR))/sqrt(Var(TBAR)).                     **/
+/* Appropriate E(TBAR) and Var(TBAR) are found in                       **/
+/* Table 3 of Im,Pesaran,Shin (2003)                                    **/
+/* NOTEs: Default setting is to print the results. It can be            **/
+/*       suppressed by choosing "outpt=0" below (7th-line of the code   **/
+/* Takashi Yamagata, 13 March 2006                                        **/
+/*                                                                      **/
+/*************************************************************************/
+proc(4) = ips(var_mat,maxp,case);
+    local outpt,n,t,tlag,var_mat_1,Dvar_mat_temp,Dvar_mat;
+    local tt,y,z,x,xx,k1,k2,bvec,sevec,t_vec,t_bar,i,c_p,temp;
+    local trncl,truncu,trnc1,adf_p,adf_ps,tbar_p_mat,tbar_p,tbar_ps;
+    local adf_p_mat,adfs_p_mat,idvec,lgorder,res_p_mat,res_p;
+    
+    
+    /*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
+    outpt=0;/* 1: reports ourput, 0:supress the output */
+    /*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
+    outwidth 256;
+    
+    t=rows(var_mat);
+    n=cols(var_mat);
+    tlag=maxp+1;
+    
+    var_mat_1=lag(var_mat);
+    Dvar_mat_temp=var_mat-var_mat_1;
+    var_mat_1=var_mat_1[tlag+1:t,.];
+    Dvar_mat=Dvar_mat_temp[tlag+1:t,.];
+    
+    tt=t-tlag;
+    
+    /*************/
+    y=vec(Dvar_mat);
+    x=vec(var_mat_1);
+    
+    /****/
+    if case==1;
+        k1=-6.12;
+        k2=4.16;
+    elseif case==2;
+        Z=ones(n*tt,1);
+        k1=-6.19;
+        k2=2.61;
+    elseif case==3;
+        Z=ones(n*tt,1)~(ONES(N,1).*.seqa(1,1,tt));
+        k1=-6.42;
+        k2=1.70;
+    else;
+        "please choose the 'case' only from 1,2, or 3";
+        end;
+    endif;
+    
+    /**************** ESTIMATION ****************/
+    c_p=0;
+    tbar_p_mat={};
+    adf_p_mat={};
+    adfs_p_mat={};
+    res_p_mat={};
+    do while c_p<=maxp;
+        
+        if c_p>0;
+            temp=(Dvar_mat_temp[tlag+1-c_p:t-c_p,.]);
+            x=x~vec(temp);
+        endif;
+        
+        /*************/
+        if case==1;
+            xx=x;
+        else;
+            xx=x~Z;
+        endif;
+        
+        /*** MGCCE ****/
+        {bvec,sevec,t_vec,res_p}=mgsimple(y,xx,n,tt);
+        
+        trncl=k1*(t_vec[.,1].<k1);
+        truncu=k2*(t_vec[.,1].>k2);
+        trnc1=(t_vec[.,1].>k1).*(t_vec[.,1].<k2);
+        
+        adf_p = t_vec[.,1];
+        adf_ps = (t_vec[.,1].*trnc1+trncl+truncu);
+        
+        tbar_p=meanc(adf_p);
+        tbar_ps=meanc(adf_ps);
+        
+        if outpt==1;
+            format /rd 2,0;
+            "@@@@@@@@@@@@@@@@@@@ ADF(";;
+            C_P;;
+            ") @@@@@@@@@@@@@@@@@@@@";
+            format /rd 2,0;
+            "tbar STATISTIC FOR IPS(P): CASE";;
+            case;;
+            if case==1;
+                ", NO INTERCEPT";
+            elseif case==2;
+                ", WITH INTERCEPT";
+            elseif case==3;
+                ", WITH INTERCEPT AND TREND";
+            endif;
+            format /rd 5,0;
+            "N=";;
+            n;;
+            ", T=";;
+            tt;;
+            ", (";;
+            t;;
+            "data points used)";
+            format /rd 8,3;
+            "   TBAR(P)            :";;
+            tbar_p;
+            "   TBAR(P)*(truncated):";;
+            tbar_ps;
+            format /rd 1,2;
+            "*Truncation is done for ADF_i in such a way that";
+            "when ADF_i<k1, ADF_i=k1 and when ADF_i>k2, ADF_i=k2,";
+            "where ";;
+            "k1=";;
+            k1;;
+            " and k2=";;
+            k2;;
+            ".";
+            "IPS is sqrt(N)*(TBAR - E(TBAR))/sqrt(Var(TBAR)).";
+            "Appropriate E(TBAR) and Var(TBAR) are found in Table 3 of Im,Pesaran,Shin (2003).";
+            "-------------------------------------------------------";
+            "";
+        endif;
+        tbar_p_mat=tbar_p_mat|(tbar_p~tbar_ps);
+        adf_p_mat=adf_p_mat~adf_p;
+        adfs_p_mat=adfs_p_mat~adf_ps;
+        res_p_mat=res_p_mat|res_p;
+        
+        c_p=c_p+1;
+    endo;
+    
+    if outpt==1;
+        format /rd 8,0;
+        idvec=ftocv(seqa(1,1,n),1,0);
+        lgorder="id/p"~ftocv(seqa(0,1,maxp+1)',1,0);
+        
+        format /rd 2,0;
+        "";
+        "*****************************************************";
+        "ADF_i(p) Statistics: Case";;
+        case;;
+        if case==1;
+            ", NO INTERCEPT";
+        elseif case==2;
+            ", WITH INTERCEPT";
+        elseif case==3;
+            ", WITH INTERCEPT AND TREND";
+        endif;
+        format /rd 8,0;
+        $ (lgorder|(idvec~ftocv(adf_p_mat,1,3)));
+        "";
+        "*****************************************************";
+        format /rd 2,0;
+        "ADF*_i(p) Statistics (truncated): Case";;
+        case;;
+        if case==1;
+            ", NO INTERCEPT";
+        elseif case==2;
+            ", WITH INTERCEPT";
+        elseif case==3;
+            ", WITH INTERCEPT and TREND";
+        endif;
+        format /rd 8,0;
+        $ (lgorder|(idvec~ftocv(adfs_p_mat,1,3)));
+        format /rd 1,2;
+        "*Truncation is done for ADF_i in such a way that";
+        "when ADF_i<k1, ADF_i=k1 and when ADF_i>k2, ADF_i=k2,";
+        "where ";;
+        "k1=";;
+        k1;;
+        " and k2=";;
+        k2;;
+        ".";
+    endif;
+    
+    format /rd 16,8;
+    retp(tbar_p_mat,adf_p_mat,adfs_p_mat,res_p_mat);
+endp;
+
+/*** OLS regression for each cross section unit ****/
+proc(4)=mgsimple(y,x,n,t);
+    local bvec,sevec,tvec,i,y_i,x_i,_beta_i,e_i,zig2,se_i,t_i,res_mat;
+    bvec=zeros(n,cols(x));
+    sevec=zeros(n,cols(x));
+    tvec=zeros(n,cols(x));
+    res_mat={};
+    i=1;
+    do while i<=n;
+        y_i=y[1+(i-1)*t:(i)*t,.];
+        x_i=x[1+(i-1)*t:(i)*t,.];
+        _beta_i=y_i/x_i;
+        e_i=y_i-x_i*_beta_i;
+        zig2=e_i'e_i/(T-cols(x));
+        se_i=sqrt(diag(zig2*invpd(x_i'x_i)));
+        t_i=_beta_i./se_i;
+        
+        bvec[i,.]=_beta_i';
+        sevec[i,.]=se_i';
+        tvec[i,.]=t_i';
+        res_mat=res_mat~e_i;
+        
+        i=i+1;
+    endo;
+    
+    retp(bvec,sevec,tvec,res_mat);
+endp;
+
+
+
+
+/**********************/
+/* Pesaran's (2004)
+cross section dependenc
+test (CD test)
+and Breusch-Pagan (1980)
+LM test,
+
+{cd,lm}=cdlm(y_mat);
+
+Input: y_mat (TxN)
+N: cross section dimension
+T: time series dimension
+
+output:
+cd: Pesaran's (2004) CD test
+lm: Breusch-Pagan (1980) LM test
+
+Under the null of no CSD,
+cd ~ N(0,1)
+lm ~ chi-squared with N(N-1)/2 dof.
+*/
+
+proc(4)=cdlm(y_mat);
+    
+    local t,n,r_mat,i,j,y_mat_dm,sum_r_ij,sum_r2_ij;
+    local r_i,r_j,r_ij,rsq_ave,r_ave,cd,lm,nlm;
+    local vect_corr, lm_z;
+    
+    /** rank **/
+    t=rows(y_mat);
+    n=cols(y_mat);
+    
+    y_mat_dm= y_mat - meanc(y_mat)';
+    
+    sum_r_ij=0;
+    sum_r2_ij=0;
+    vect_corr=zeros(1,3);
+    
+    i=1;
+    do while i<=n-1;
+        j=i+1;
+        do while j<=n;
+            r_i=y_mat_dm[.,i];
+            r_j=y_mat_dm[.,j];
+            r_ij = (r_i'r_j)/(sqrt(r_i'r_i)*sqrt(r_j'r_j));
+            vect_corr=vect_corr|(i~j~r_ij);
+            sum_r_ij=sum_r_ij + r_ij;
+            sum_r2_ij=sum_r2_ij + r_ij^2;
+            
+            j=j+1;
+        endo;
+        i=i+1;
+    endo;
+    
+    cd=sqrt(t)*sum_r_ij/sqrt(n*(n-1)/2);
+    lm=(t)*sum_r2_ij;
+    lm_z=(lm-n*(n-1)/2)/sqrt(n*(n-1));
+    
+    vect_corr=vect_corr[2:rows(vect_corr),.];
+    retp(cd,lm,lm_z,vect_corr);
+endp;
+
+
+
+
+proc(7)=outlier_restud(y,x,pair);
+    
+    local T, k, res, H, h_i, s2, s2_i, res_studentized, abs_res_studentized, outliers, indic_outlier, x_rob, y_rob, _beta_rob_out, DDFITS, w_i;
+    local DCook,pval_Dcook, influentials, indic_influen, _beta_rob_influen;
+    
+    T=rows(y);
+    k=cols(x);
+    
+    res=y-x*(y/x); @ OLS residuals @
+    
+    H=x*invpd(x'x)*x';
+    h_i=diag(H);
+    
+    s2=res'res/(T-k);
+    
+    s2_i=(res'res-res^2./(1-h_i))/(T-k-1); @ Variance of the disturbance term removin the i-th observation @
+    
+    res_studentized=res./(sqrt(s2_i).*(1-h_i));
+    
+    
+    abs_res_studentized=abs(res_studentized);
+    outliers=seqa(1,1,rows(abs_res_studentized))~pair~abs_res_studentized;
+    
+    @ Estimate the model without the outliers @
+    
+    x_rob=selif(x,outliers[.,cols(outliers)] .lt cdftci(0.025,T-k)); @ Compare the values with a t-Student with T-k d.f., at 5% level of sign. @
+    y_rob=selif(y,outliers[.,cols(outliers)] .lt cdftci(0.025,T-k)); @ Compare the values with a t-Student with T-k d.f., at 5% level of sign. @
+    
+    _beta_rob_out=y_rob/x_rob;
+    
+    indic_outlier=selif(outliers, outliers[.,cols(outliers)] .ge cdftci(0.025,T-k)); @ Compare the values with a t-Student with T-k d.f., at 5% level of sign. @
+    
+    
+    @ Influent observations @
+    
+    DDFITS=sqrt(h_i./(1-h_i)).*res_studentized; @ DDFITS @
+    DCook=res_studentized^2/k.*(h_i./(1-h_i)); @ Cook's distance @
+    
+    pval_Dcook=cdffc(DCook,k,T-k);
+    influentials=seqa(1,1,T)~pair~pval_Dcook;
+    indic_influen=selif(influentials,influentials[.,cols(influentials)] .lt 0.05);
+    
+    @ Estimate the model without the influential observations (according to Cook's distance) @
+    
+    x_rob=selif(x,influentials[.,cols(influentials)] .ge 0.05); @ Compare the values with a F-Snedecor, at 5% level of sign. @
+    y_rob=selif(y,influentials[.,cols(influentials)] .ge 0.05); @ Compare the values with a F-Snedecor, at 5% level of sign. @
+    
+    _beta_rob_influen=y_rob/x_rob;
+    
+    
+    w_i=abs(DDFITS);
+    
+    retp(res_studentized,DDFITS,indic_outlier,indic_influen,y/x,_beta_rob_out, _beta_rob_influen);
+    
+endp;
+
+
+
+proc(5)=csd_tests(y_mat);
+    
+    local t,n,i,j,y_mat_dm,sum_r_ij,sum_r2_ij;
+    local r_i,r_j,r_ij,r_ave,r2_ave,FR,FRE,Var_Q,FRE_asymp, Q, df_1, df_2;
+    local vect_corr, chi_1, chi_2, a_T, b_T, temp_dist;
+    
+    t=rows(y_mat);
+    n=cols(y_mat);
+    
+    y_mat_dm = y_mat; @ Matrix to store the rank of the observations @
+    
+    i=1;
+    do until i>n;
+        y_mat_dm[.,i]=rankindx(y_mat[.,i],1); @ Compute the rank @
+        i=i+1;
+    endo;
+    
+    sum_r_ij=0;
+    sum_r2_ij=0;
+    
+    i=1;
+    do while i<=n-1;
+        j=i+1;
+        do while j<=n;
+            r_i=y_mat_dm[.,i]-(T+1/2);
+            r_j=y_mat_dm[.,j]-(T+1/2);
+            r_ij = (r_i'r_j)/(r_i'r_i); @ Spearman's rank correlation coefficient @
+            sum_r_ij=sum_r_ij + r_ij;
+            sum_r2_ij=sum_r2_ij + r_ij^2;
+            j=j+1;
+        endo;
+        i=i+1;
+    endo;
+    
+    r_ave=(2/(n*(n-1)))*sum_r_ij; @ Friedman's R_ave statistic @
+    r2_ave=(2/(n*(n-1)))*sum_r2_ij; @ Frees's R2_ave statistic @
+    
+    FR=(T-1)*((N-1)*r_ave+1); @ Friedman's statistic, which is distributed as a Chi-squared with (T-1) d.f. @
+    
+    FRE=N*(r2_ave-1/(T-1)); @ Frees's statistic @
+    Var_Q=(32/25)*(T+2)^2/((T-1)^3*(T+1)^2)+(4/5)*(5*T+6)^2*(T-3)/(T*(T-1)^2*(T+1)^2);
+    
+    FRE_asymp=FRE/sqrt(Var_Q); @ Using the standard normal approximation for large T @
+    
+    df_1=T-1;
+    df_2=T*(T-3)/2;
+    
+    chi_1 = cdfchii(seqa(0.01,0.01,100),df_1);
+    chi_2 = cdfchii(seqa(0.01,0.01,100),df_2);
+    
+    a_T=4*(T+2)/(5*(T-1)^2*(T+1));
+    b_T=2*(5*T+6)/(5*T*(T-1)*(T+1));
+    
+    Q=a_T*(chi_1-(T-1))+b_T*(chi_2-T*(T-3)/2);
+    temp_dist=quantile(Q,0.9|0.95|0.975|0.99);
+    temp_dist=1/(T-1)+temp_dist/N; @ Critical values at the 10, 5, 2.5 and 1% level of significance @
+    
+    retp(FR,cdfchic(FR,T-1),FRE,temp_dist,FRE_asymp);
+    
+endp;

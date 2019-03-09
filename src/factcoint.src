@@ -1,0 +1,1630 @@
+
+/*
+** Procedure to compute the common factors
+**
+** Sintaxis:
+**
+**      {e,  Fhat,  csi,  m_tbe} = factcoint_iter(y, x, model, m_Tb, k);
+**
+** Input:
+**
+**      y       (TxN)-matrix of endogenous variables
+**
+**      x       (Tx(kreg*N))-matrix of stochastic regressors
+**
+**      model   (2x1)-vector,  denotes the deterministic model
+**
+**              model[1] = 1 for the individual effects model (Pedroni model), 
+**              model[1] = 2 for the individual and time effects model (Pedroni model), 
+**              model[1] = 3 for the individual effects and one level shift model (no break in the cointegrating vector), 
+**              model[1] = 4 for the individual and time effects and one level shift (no break in the cointegrating vector), 
+**              model[1] = 5 for the individual and time effects,  with both level and slope shift (no break in the cointegrating vector), 
+**              model[1] = 6 for the individual effects,  with both level and cointegrating vector shift, 
+**              model[1] = 7 for the individual and time effects,  with both level (no trend shift) and cointegrating vector shift, 
+**              model[1] = 8 for the individual and time effects,  with all level,  time trend and cointegrating vector shift.
+**
+**              model[2] = 0 if the break dates are known
+**                       = 1 if the break dates are unknown
+**
+**      m_Tb    (Nx1)-vector of estimated break points; m_Tb = 0 if there are no structural breaks.
+**
+**      k       (2x1)-vector for the common factors
+**
+**              k[1] = 0 if the number of common factors is known
+**                   = 1 if the number of common factors is unknown
+**              k[2] scalar,  with the maximum number of common factors
+**
+**      tolerance   Scalar,  tolerance for the difference of the SSR of two consecutive iterations
+**
+**      max_iter    Scalar,  maximum number of iterations
+**
+** Output:
+**
+**      e       (T-1xN)-matrix of idiosyncratic disturbance terms.
+**
+**      Fhat    (T-1 x r)-matrix of common factors.
+**
+**		csi			(N x r)-matrix of factor loadings.
+**
+**	    m_tbe	(Nx1)-vector of estimated break points.
+**
+**      i       Scalar,  final number of iterations.
+**
+**
+**      (c) 2013 Josep Lluís Carrion-i-Silvestre
+**              Department of Econometrics
+**              University of Barcelona
+*/
+
+
+proc (5) = factcoint_iter(y, x, model, m_Tb, k, tolerance, max_iter);
+    
+    local T,  N,  e,  Fhat,  csi,  m_tbe,  SSR_opt,  m_tbe_opt,  Fhat_opt,  csi_opt,  diff_SSR,  i,  y_temp,  SSR_2;
+    
+    T = rows(y);
+    N = cols(y);
+    
+    {e,  Fhat,  csi,  m_tbe} = factcoint(y, x, model, m_Tb, 0|0); @ Initial estimation of the break points,  ignoring the common factors @
+    
+    SSR_opt = sumc(diag(e'e));
+    m_tbe_opt = m_tbe;
+    Fhat_opt = fhat;
+    csi_opt = csi;
+    
+    y_temp = y;
+    
+    diff_SSR = 1;
+    i = 0;
+    do until i>max_iter;
+        
+        {e,  Fhat,  csi,  m_tbe} = factcoint(y_temp, x, model[1]|0, m_tbe_opt, k); @ estimation of the common factors,  assuming the estimated breaks as known @
+        
+        SSR_2 = sumc(diag(e'e));
+        
+        diff_SSR = SSR_2 - SSR_opt;
+        
+        print "Intermediate results" ssr_opt~ssr_2~diff_ssr;
+        
+        if abs(diff_SSR)>tolerance;
+            
+            y_temp = y[2:T, .]-Fhat*csi'; @ Remove the factors @
+            
+            {e,  Fhat,  csi,  m_tbe} = factcoint(y_temp, x[2:T, .], model, m_Tb, 0|0); @ estimation of the breaks,  assuming no common factors @
+            
+            m_tbe_opt = m_tbe + 1; @ The new set of estimated breaks; add one since the sample used in the last estimation started at t=2 @
+            SSR_opt = SSR_2;
+            
+            y_temp = y;
+            
+        else;
+            goto theend;
+        endif;
+        
+        i = i + 1;
+    endo;
+    
+    theend:
+        
+        {e, Fhat, csi, m_tbe} = factcoint(y, x, model[1]|0, m_tbe_opt, k); @ estimation of the common factors,  assuming the estimated breaks as known @
+    
+    retp(e, Fhat, csi, m_tbe_opt, i);
+    
+endp;
+
+
+
+
+/*
+** Procedure to compute the common factors
+**
+** Sintaxis:
+**
+**      {e,  Fhat,  csi,  m_tbe} = factcoint(y, x, model, m_Tb, k);
+**
+** Input:
+**
+**      y       (TxN)-matrix of endogenous variables
+**
+**      x       (Tx(kreg*N))-matrix of stochastic regressors
+**
+**      model   Scalar,  denotes the deterministic model
+**
+**              model = 1 for the individual effects model (Pedroni model), 
+**              model = 2 for the individual and time effects model (Pedroni model), 
+**              model = 3 for the individual effects and one level shift model (no break in the cointegrating vector), 
+**              model = 4 for the individual and time effects and one level shift (no break in the cointegrating vector), 
+**              model = 5 for the individual and time effects,  with both level and slope shift (no break in the cointegrating vector), 
+**              model = 6 for the individual effects,  with both level and cointegrating vector shift, 
+**              model = 7 for the individual and time effects,  with both level (no trend shift) and cointegrating vector shift, 
+**              model = 8 for the individual and time effects,  with all level,  time trend and cointegrating vector shift.
+**
+**      m_Tb    (Nx1)-vector of estimated break points; m_Tb = 0 if there are no structural breaks.
+**
+**      k       (2x1)-vector for the common factors
+**
+**              k[1] = 0 if the number of common factors is known
+**                   = 1 if the number of common factors is unknown
+**              k[2] scalar,  with the maximum number of common factors
+**
+** Output:
+**
+**      e       (T-1xN)-matrix of idiosyncratic disturbance terms.
+**
+**      Fhat    (T-1 x r)-matrix of common factors.
+**
+**			csi			(N x r)-matrix of factor loadings.
+**
+**			m_tbe		N-vector of estimated breaks.
+**
+**	m_tbe	(Nx1)-vector of estimated break points.
+**
+**
+**      (c) 2006 Josep Lluís Carrion-i-Silvestre
+**              Department of Econometrics
+**              University of Barcelona
+*/
+
+proc(4) = factcoint(y, x, model, m_Tb, k);
+    
+    local t, n, kreg, D_res_coin, i, y_i, x_i, j, Dy_i, Dx_i, beta, Dtb, dudx, du, u, s, v, csi, fhat, De, e, CT, sigma, IC1;
+    local SSR,  m_tbe;
+    
+    T = rows(y); @ Sample size @
+    N = cols(y); @ Number of individuals @
+    kreg = cols(x)/N; @ Number of regressors @
+    
+    
+    D_res_coin = zeros(T-1, N);
+    
+    SSR = zeros(int(0.85*t)-int(0.15*t)+1, n);
+    
+    i = 1;
+    do until i > n;
+        
+        y_i = y[., i]; @ Endogenous variable @
+        x_i = x[., i]; @ First exogenous variable @
+        
+        if kreg > 1; @ Select the additional stochastic regressors if necessary @
+            j = 2;
+            do until j>kreg;
+                x_i = x_i~x[., i+(j-1)*N]; @ Additional regressors @
+                j = j + 1;
+            endo;
+        endif;
+        
+        Dy_i = y_i[2:t, .]-y_i[1:t-1, .];
+        Dx_i = x_i[2:t, .]-x_i[1:t-1, .];
+        
+        
+        if model[2] == 0; @ known break @
+            if model[1] == 1; @ Fixed effects model's specification @
+                beta = Dy_i/Dx_i;
+                D_res_coin[., i] = Dy_i-Dx_i*beta;
+                m_tbe = 0;
+            elseif model[1] == 2; @ Fixed and time effects model's specification @
+                beta = Dy_i/(ones(T-1, 1)~Dx_i);
+                D_res_coin[., i] = Dy_i-(ones(T-1, 1)~Dx_i)*beta;
+                m_tbe = 0;
+            elseif model[1] == 3; @ Fixed effects and level shift @
+                DTb = zeros(T, 1);
+                Dtb[m_tb[i]+1] = 1;
+                beta = Dy_i/(DTb[2:t]~Dx_i);
+                D_res_coin[., i] = Dy_i-(DTb[2:t]~Dx_i)*beta;
+                m_tbe = m_tb;
+            elseif model[1] == 4; @ Fixed and time effects and level shift @
+                DTb = zeros(T, 1);
+                Dtb[m_tb[i]+1] = 1;
+                beta = Dy_i/(ones(T-1, 1)~DTb[2:t]~Dx_i);
+                D_res_coin[., i] = Dy_i-(ones(T-1, 1)~DTb[2:t]~Dx_i)*beta;
+                m_tbe = m_tb;
+            elseif model[1] == 5; @ Fixed and time effects with bothe level and slope shift @
+                DTb = zeros(T, 1);
+                Dtb[m_tb[i]+1] = 1;
+                du = zeros(m_tb[i], 1)|ones(t-m_tb[i], 1);
+                beta=Dy_i/(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i);
+                D_res_coin[., i]=Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i)*beta;
+                m_tbe=m_tb;
+            elseif model[1] == 6; @ Fixed effects and level and cointegrating shift @
+                DTb=zeros(T, 1);
+                Dtb[m_tb[i]+1]=1;
+                du=zeros(m_tb[i], 1)|ones(t-m_tb[i], 1);
+                dudx=du.*x_i;
+                dudx=dudx[2:t, .]-dudx[1:t-1, .];
+                beta=Dy_i/(DTb[2:t]~Dx_i~dudx);
+                D_res_coin[., i]=Dy_i-(DTb[2:t]~Dx_i~dudx)*beta;
+                m_tbe=m_tb;
+            elseif model[1] == 7; @ Fixed and time effects,  and level and cointegrating shift @
+                DTb=zeros(T, 1);
+                Dtb[m_tb[i]+1]=1;
+                du=zeros(m_tb[i], 1)|ones(t-m_tb[i], 1);
+                dudx=du.*x_i;
+                dudx=dudx[2:t, .]-dudx[1:t-1, .];
+                beta=Dy_i/(ones(T-1, 1)~DTb[2:t]~Dx_i~dudx);
+                D_res_coin[., i]=Dy_i-(ones(T-1, 1)~DTb[2:t]~Dx_i~dudx)*beta;
+                m_tbe=m_tb;
+            elseif model[1] == 8; @ Fixed and time effects,  and level,  time trend and cointegrating shift @
+                DTb=zeros(T, 1);
+                Dtb[m_tb[i]+1]=1;
+                du=zeros(m_tb[i], 1)|ones(t-m_tb[i], 1);
+                dudx=du.*x_i;
+                dudx=dudx[2:t, .]-dudx[1:t-1, .];
+                beta=Dy_i/(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx);
+                D_res_coin[., i]=Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx)*beta;
+                m_tbe=m_tb;
+            endif;
+            
+        elseif model[2]==1; @ unknown break @
+            
+            if model[1] == 1; @ Fixed effects model's specification @
+                beta=Dy_i/Dx_i;
+                D_res_coin[., i]=Dy_i-Dx_i*beta;
+                m_tbe=0;
+            elseif model[1] == 2; @ Fixed and time effects model's specification @
+                beta=Dy_i/(ones(T-1, 1)~Dx_i);
+                D_res_coin[., i]=Dy_i-(ones(T-1, 1)~Dx_i)*beta;
+                m_tbe=0;
+            elseif model[1] == 3; @ Fixed effects and level shift @
+                SSR=1e46;
+                j=int(0.15*t);
+                do until j>int(0.85*t);
+                    DTb=zeros(T, 1);
+                    Dtb[j+1]=1;
+                    beta=Dy_i/(DTb[2:t]~Dx_i);
+                    if (Dy_i-(DTb[2:t]~Dx_i)*beta)'(Dy_i-(DTb[2:t]~Dx_i)*beta) < SSR;
+                        D_res_coin[., i]=Dy_i-(DTb[2:t]~Dx_i)*beta;
+                        m_Tb[i]=j;
+                        SSR=(Dy_i-(DTb[2:t]~Dx_i)*beta)'(Dy_i-(DTb[2:t]~Dx_i)*beta);
+                    endif;
+                    j=j+1;
+                endo;
+                
+            elseif model[1] == 4; @ Fixed and time effects and level shift @
+                
+                SSR=1e46;
+                j=int(0.15*t);
+                do until j>int(0.85*t);
+                    DTb=zeros(T, 1);
+                    Dtb[j+1]=1;
+                    beta=Dy_i/(ones(T-1, 1)~DTb[2:t]~Dx_i);
+                    if (Dy_i/(ones(T-1, 1)~DTb[2:t]~Dx_i))'(Dy_i/(ones(T-1, 1)~DTb[2:t]~Dx_i)) < SSR;
+                        D_res_coin[., i]=Dy_i-(ones(T-1, 1)~DTb[2:t]~Dx_i)*beta;
+                        m_Tb[i]=j;
+                        SSR=(Dy_i/(ones(T-1, 1)~DTb[2:t]~Dx_i))'(Dy_i/(ones(T-1, 1)~DTb[2:t]~Dx_i));
+                    endif;
+                    j=j+1;
+                endo;
+                
+            elseif model[1] == 5; @ Fixed and time effects with both the level and slope shift @
+                
+                j=int(0.15*t);
+                do until j>int(0.85*t);
+                    DTb=zeros(T, 1);
+                    Dtb[j+1]=1;
+                    du=zeros(j, 1)|ones(t-j, 1);
+                    beta=Dy_i/(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i);
+                    
+                    SSR[j-int(0.15*t)+1, i]=(Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i)*beta)'(Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i)*beta);
+                    
+                    /*
+                    if (Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i)*beta)'(Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i)*beta) < SSR;
+                    D_res_coin[., i]=Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i)*beta;
+                    m_Tb[i]=j;
+                    SSR=(Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i)*beta)'(Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i)*beta);
+                    endif;
+                    */
+                    
+                    j=j+1;
+                endo;
+                
+            elseif model[1] == 6; @ Fixed effects and level and cointegrating shift @
+                
+                SSR=1e46;
+                j=int(0.15*t);
+                do until j>int(0.85*t);
+                    DTb=zeros(T, 1);
+                    Dtb[j+1]=1;
+                    du=zeros(j, 1)|ones(t-j, 1);
+                    dudx=du.*x_i;
+                    dudx=dudx[2:t, .]-dudx[1:t-1, .];
+                    beta=Dy_i/(DTb[2:t]~Dx_i~dudx);
+                    
+                    if (Dy_i-(DTb[2:t]~Dx_i~dudx)*beta)'(Dy_i-(DTb[2:t]~Dx_i~dudx)*beta) < SSR;
+                        D_res_coin[., i]=Dy_i-(DTb[2:t]~Dx_i~dudx)*beta;
+                        m_Tb[i]=j;
+                        SSR=(Dy_i-(DTb[2:t]~Dx_i~dudx)*beta)'(Dy_i-(DTb[2:t]~Dx_i~dudx)*beta);
+                    endif;
+                    
+                    j=j+1;
+                endo;
+                
+            elseif model[1] == 7; @ Fixed and time effects,  and level and cointegrating shift @
+                
+                SSR=1e46;
+                j=int(0.15*t);
+                do until j>int(0.85*t);
+                    DTb=zeros(T, 1);
+                    Dtb[j+1]=1;
+                    du=zeros(j, 1)|ones(t-j, 1);
+                    dudx=du.*x_i;
+                    dudx=dudx[2:t, .]-dudx[1:t-1, .];
+                    beta=Dy_i/(ones(T-1, 1)~DTb[2:t]~Dx_i~dudx);
+                    if (Dy_i-(ones(T-1, 1)~DTb[2:t]~Dx_i~dudx)*beta)'(Dy_i-(ones(T-1, 1)~DTb[2:t]~Dx_i~dudx)*beta) < SSR;
+                        D_res_coin[., i]=Dy_i-(ones(T-1, 1)~DTb[2:t]~Dx_i~dudx)*beta;
+                        m_Tb[i] = j;
+                        SSR=(Dy_i-(ones(T-1, 1)~DTb[2:t]~Dx_i~dudx)*beta)'(Dy_i-(ones(T-1, 1)~DTb[2:t]~Dx_i~dudx)*beta);
+                    endif;
+                    j=j+1;
+                endo;
+                
+            elseif model[1] == 8; @ Fixed and time effects,  and level,  time trend and cointegrating shift @
+                
+                j=int(0.15*t);
+                do until j>int(0.85*t);
+                    DTb=zeros(T, 1);
+                    Dtb[j+1]=1;
+                    du=zeros(j, 1)|ones(t-j, 1);
+                    dudx=du.*x_i;
+                    dudx=dudx[2:t, .]-dudx[1:t-1, .];
+                    beta=Dy_i/(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx);
+                    /*
+                    if (Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx)*beta)'(Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx)*beta) < SSR;
+                    D_res_coin[., i]=Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx)*beta;
+                    m_Tb[i]=j;
+                    SSR=(Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx)*beta)'(Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx)*beta);
+                    endif;
+                    */
+                    
+                    SSR[j-int(0.15*t)+1, i]=(Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx)*beta)'(Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx)*beta);
+                    
+                    j=j+1;
+                endo;
+                
+            endif;
+            
+        endif;
+        
+        i=i+1;
+    endo;
+    
+    
+    
+    
+    
+    
+    if model[2] == 1;
+        
+        if model[1] == 5 or model[1] == 8;
+            
+            m_tbe=minindc(sumc(ssr'))+int(0.15*t)-1; @ Estimated break point @
+            
+            i=1;
+            do until i>N;
+                y_i=y[., i]; @ Endogenous variable @
+                x_i = x[., i]; @ First exogenous variable @
+                
+                if kreg > 1; @ Select the additional stochastic regressors if necessary @
+                    j = 2;
+                    do until j>kreg;
+                        x_i=x_i~x[., i+(j-1)*N]; @ Additional regressors @
+                        j=j+1;
+                    endo;
+                endif;
+                
+                Dy_i=y_i[2:t, .]-y_i[1:t-1, .];
+                Dx_i=x_i[2:t, .]-x_i[1:t-1, .];
+                
+                
+                if model[1] == 5;
+                    
+                    DTb=zeros(T, 1);
+                    Dtb[m_tbe+1]=1;
+                    du=zeros(m_tbe, 1)|ones(t-m_tbe, 1);
+                    beta=Dy_i/(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i);
+                    D_res_coin[., i]=Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i)*beta;
+                    
+                elseif model[1] == 8;
+                    
+                    DTb=zeros(T, 1);
+                    Dtb[m_tbe+1]=1;
+                    du=zeros(m_tbe, 1)|ones(t-m_tbe, 1);
+                    dudx=du.*x_i;
+                    dudx=dudx[2:t, .]-dudx[1:t-1, .];
+                    beta=Dy_i/(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx);
+                    D_res_coin[., i]=Dy_i-(ones(T-1, 1)~DTb[2:t]~Du[2:t]~Dx_i~dudx)*beta;
+                    
+                endif;
+                
+                i=i+1;
+            endo;
+            
+        else;
+            
+            m_tbe=m_tb;
+            
+        endif;
+        
+    endif;
+    
+    
+    
+    start:
+        if k[1] == 0;
+        De = D_res_coin;
+        e=cumsumc(De);
+        fhat=0;
+        csi=0;
+        goto theend; @ We don't have common factors @
+    endif;
+    
+    
+    
+    {u, s, v}=svd1(D_res_coin'*D_res_coin);
+    
+    if k[2] == 0; @ Manual selection of the number of factors @
+        csi=sqrt(n)*u[., 1:k[1]];
+        fhat=inv(n)*D_res_coin*csi;
+        De = D_res_coin - fhat*csi';
+        e=cumsumc(De);
+    elseif k[2] == 1; @ Estimation of the number of factors as in Bai and Ng (2002,  Econometrica) @
+        CT=zeros(k[1], 1);
+        sigma=zeros(k[1], 1);
+        IC1=zeros(k[1], 1);
+        i=1;
+        do until i>k[1];
+            CT[i] = ln(N*T/(N+T))*i*(N+T)/(N*T); @ Panel BIC @
+            csi=sqrt(n)*u[., 1:i];
+            fhat=inv(n)*D_res_coin*csi;
+            De = D_res_coin - fhat*csi';
+            sigma[i] = meanc(sumc(De.*De/T));
+            IC1[i] = ln(sigma[i]) + CT[i];
+            i=i+1;
+        endo;
+        IC1 = ln(meanc(sumc(D_res_coin.*D_res_coin/T)))|IC1; @ We compute the IC1 for k=0 @
+        
+        k[1]=minindc(IC1)-1; @ The estimated number of factors @
+        
+        if k[1] == 0;
+            goto start; @ We don't have common factors @
+        endif;
+        
+        
+        csi=sqrt(n)*u[., 1:k[1]];
+        fhat=inv(n)*D_res_coin*csi;
+        De = D_res_coin - fhat*csi';
+        e=cumsumc(De);
+    endif;
+    
+    theend:
+        
+        retp(e, cumsumc(fhat), csi, m_tbe);
+endp;
+
+/*
+** Procedure to compute the MQ tests proposed in Bai and Ng (2004,  Econometrica)
+**
+**      Sintaxis:
+**
+**          {MQtest,  r_star} = MQ_test(F, model, N, k);
+**
+**      Input:
+**
+**          F       (Txr)-matrix of detrended common factors. These common factors are the detrended common factors!!!!!
+**
+**          model   Scalar,  indicates the model that is used and defines the set of critical values that are used
+**
+**          N       Number of individuals from which the common factors have been extracted
+**
+**          k       (2x1)-vector: k = 0 if we follow the non-parametric approach,  k = 1 if we follow the parametric one.
+**
+**      Output:
+**
+**          MQtest  Scalar,  the value of the test statistic.
+**
+**          r_star  Estimated number of stochastic common trends.
+**
+**      (c) 2005 Josep Lluís Carrion-i-Silvestre
+**              Department of Econometrics
+**              University of Barcelona
+*/
+
+proc(2)=MQ_test(F, model, n, k);
+    
+    local r,  T,  temp,  u_F,  s_F,  v_F,  r_star,  Yc,  p,  Yc_lag,  j,  m_beta,  m_res,  sigma,  bigJ,  phi_c,  u,  s,  v,  v_c,  MQ,  critical_values;
+    local D_Yc,  D_Yc_lag,  Yc_filtered,  i,  l,  Det_omega,  m_bic;
+    
+    r = cols(F); @ Number of factors @
+    T = rows(F); @ Number of time observations @
+    
+    if model[1] == 1 or model[1] == 3 or model[1] == 6; @ Constant case @
+        critical_values = { -20.151 -13.730 -11.022, 
+            -31.621 -23.535 -19.923, 
+            -41.064 -32.296 -28.399, 
+            -48.501 -40.442 -36.592, 
+            -58.383 -48.617 -44.111, 
+            -66.978 -57.040 -52.312, 
+            -78.251659       -67.465203       -62.171822, 
+            -86.619094       -76.042352       -70.590069, 
+            -95.297245       -83.823797       -78.376095, 
+            -104.04440       -92.623120       -86.934904, 
+            -112.49058       -100.26543       -94.669505, 
+            -120.31501       -108.17400       -102.53810}; @ The first six rows are from Bai and Ng (2004),  Table I; the others are obtained by simulation following Bai and Ng (2004) @
+        /*
+        critical_values = { -19.480751	-13.438666	-10.902665, 
+        -30.046219	-22.780622	-19.417082, 
+        -37.121553	-30.348576	-27.050282, 
+        -45.613872	-37.987673	-34.314198, 
+        -52.333588	-44.978368	-41.573178, 
+        -59.138642	-51.951253	-48.156806}; @ Simulated for T = 100 observations @
+        */
+        
+        
+    elseif model[1] == 2 or model[1] == 4 or model[1] == 7; @ Trend case @
+        critical_values = { -29.246 -21.313 -17.829, 
+            -38.619 -31.356 -27.435, 
+            -50.019 -40.180 -35.685, 
+            -58.140 -48.421 -44.079, 
+            -64.729 -55.818 -55.286, 
+            -74.251 -64.393 -59.555, 
+            -85.359813       -74.068345       -69.072567, 
+            -93.493976       -82.332640       -76.962077, 
+            -102.36794       -90.895894       -85.191932, 
+            -109.64072       -98.474676       -92.663414, 
+            -119.23274       -106.64284       -100.87500, 
+            -127.14714       -114.87589       -108.92672}; @ The first six rows are from Bai and Ng (2004),  Table I; the others are obtained by simulation following Bai and Ng (2004) @
+    elseif model[1] == 5 or model[1] == 8;
+        
+        /*
+        temp = model[2]; @ Break fraction parameter @
+        
+        if (0 < temp) and (temp <= 0.15);
+        
+        critical_values = { -32.163	-23.629	-19.865, 
+        -43.372	-34.321	-30.056, 
+        -53.648	-44.378	-39.748, 
+        -63.359	-53.470	-48.595, 
+        -73.691	-62.796	-57.434, 
+        -81.346	-71.238	-65.663};
+        
+        elseif (0.15 < temp) and (temp <= 0.25);
+        
+        critical_values = { -34.858	-26.091	-22.144, 
+        -46.436	-37.139	-32.688, 
+        -55.828	-46.232	-41.766, 
+        -65.206	-55.582	-50.645, 
+        -74.601	-64.165	-59.199, 
+        -83.575	-72.562	-67.309};
+        
+        elseif (0.25 < temp) and (temp <= 0.35);
+        
+        critical_values = { -36.123	-27.562	-23.619, 
+        -46.773	-37.778	-33.492, 
+        -57.136	-47.511	-42.775, 
+        -65.570	-55.883	-51.370, 
+        -75.573	-64.731	-59.919, 
+        -83.921	-73.247	-67.908};
+        
+        elseif (0.35 < temp) and (temp <= 0.45);
+        
+        critical_values = { -36.635	-28.147	-24.140, 
+        -47.134	-38.391	-34.282, 
+        -57.176	-47.642	-43.088, 
+        -67.481	-56.958	-52.039, 
+        -75.603	-65.386	-60.204, 
+        -84.718	-73.703	-68.372};
+        
+        elseif (0.45 < temp) and (temp <= 0.55);
+        
+        critical_values = { -36.775	-28.226	-24.419, 
+        -48.148	-38.907	-34.553, 
+        -56.753	-47.715	-43.333, 
+        -65.752	-56.418	-51.708, 
+        -75.378	-65.302	-60.251, 
+        -83.902	-73.746	-68.222};
+        
+        elseif (0.55 < temp) and (temp <= 0.65);
+        
+        critical_values = { -36.805	-28.178	-24.176, 
+        -47.611	-38.587	-34.246, 
+        -57.230	-47.865	-43.200, 
+        -67.094	-56.599	-51.785, 
+        -75.182	-64.986	-60.057, 
+        -84.059	-73.136	-67.973};
+        
+        elseif (0.65 < temp) and (temp <= 0.75);
+        
+        critical_values = { -36.302	-27.751	-23.890, 
+        -47.383	-38.223	-34.045, 
+        -56.908	-47.282	-42.693, 
+        -66.869	-56.270	-51.337, 
+        -75.074	-64.828	-59.867, 
+        -85.434	-73.646	-68.332};
+        
+        elseif (0.75 < temp) and (temp <= 0.85);
+        
+        critical_values = { -35.249	-26.722	-22.713, 
+        -46.572	-37.227	-33.085, 
+        -55.960	-46.442	-41.998, 
+        -65.833	-55.750	-50.890, 
+        -74.046	-64.430	-59.290, 
+        -83.244	-72.857	-67.721};
+        
+        elseif (0.85 < temp) and (temp < 1);
+        
+        critical_values = { -32.918	-24.712	-20.896, 
+        -43.959	-35.248	-31.190, 
+        -54.568	-45.183	-40.623, 
+        -63.920	-53.985	-49.399, 
+        -74.177	-63.063	-57.839, 
+        -82.664	-71.518	-66.449};
+        
+        endif;
+        */
+        
+        
+        if T<=75;
+            
+            critical_values = {	-31.046	-24.828	-21.669, 
+                -38.827	-32.792	-29.925, 
+                -44.744	-39.703	-36.641, 
+                -47.752	-44.865	-42.381, 
+                -48.756	-47.472	-46.119, 
+                -48.890	-48.444	-47.879};
+        elseif (75<T) and (T<=200);
+            
+            critical_values = {	-34.474	-26.833	-23.102, 
+                -44.748	-36.464	-32.729, 
+                -53.423	-45.879	-41.862, 
+                -61.972	-53.251	-49.284, 
+                -69.033	-61.099	-56.747, 
+                -74.663	-67.183	-63.437};
+        elseif T>200;
+            
+            critical_values = {	-32.985	-25.697	-22.843, 
+                -46.953	-38.103	-33.778, 
+                -52.827	-45.066	-41.136, 
+                -59.494	-53.392	-49.240, 
+                -70.495	-62.404	-57.440, 
+                -78.589	-68.748	-64.459};
+            
+        endif;
+        
+    endif;
+    
+    
+    temp = T^(-2)*F'*F;
+    
+    {u_F, s_F, v_F} = svd1(temp);
+    
+    r_star = r; @ Initial number of common trends (the dimension of F) @
+    
+    inici:
+        
+        Yc = F*u_F[., 1:r_star];
+    
+    if k[1] == 0; @ Non-parametric test statistic @
+        @++++++++++++++++++++++++++@
+        @ Non-parametric statistic @
+        @++++++++++++++++++++++++++@
+        
+        p=1; @ Order of the VAR model @
+        Yc_lag=lag(Yc); @ First lagged regressors @
+        
+        temp=trimr(Yc~Yc_lag, p, 0);
+        m_beta=zeros(p*(cols(temp)-cols(Yc)), cols(Yc)); @ Matrix to store the autoregressive coefficients @
+        m_res=zeros(rows(temp), cols(Yc)); @ Matrix to store the residuals @
+        j=1;
+        do until j>cols(Yc); @ Loop to estimate each equation in the VAR system by OLS @
+            m_beta[., j]=temp[., j]/temp[., cols(Yc)+1:cols(temp)]; @ Estimate the parameters by OLS @
+            m_res[., j]=temp[., j]-temp[., cols(Yc)+1:cols(temp)]*m_beta[., j]; @ Compute the OLS-residuals @
+            j=j+1;
+        endo;
+        
+        sigma=0;
+        
+        bigJ = 4*ceil((minc(T|n)/100)^(1/4));
+        j=1;
+        do until j>bigJ;
+            sigma = sigma + (1-j/(bigJ+1))*T^(-1)*m_res[1:rows(m_res)-j, .]'*m_res[j+1:rows(m_res), .];
+            j=j+1;
+        endo;
+        
+        PHI_c = (1/2)*(Yc[2:rows(Yc), .]'*Yc[1:rows(Yc)-1, .]+Yc[1:rows(Yc)-1, .]'*Yc[2:rows(Yc), .]-T*(sigma+sigma'))
+            *invpd(Yc[1:rows(Yc)-1, .]'*Yc[1:rows(Yc)-1, .]);
+        
+        {u, s, v} = svd1(phi_c);
+        
+        v_c = s[rows(s), cols(s)]; @ The smallest eigenvalue of PHI_c @
+        MQ = T*(v_c-1);
+        
+        if (r_star > 0) and (MQ < critical_values[r_star, 2]); @ We make the inference at the 5% level of significance @
+            r_star = r_star-1;
+            if r_star > 0;
+                goto inici;
+            else;
+                goto theend;
+            endif;
+        endif;
+        
+    elseif k[1] == 1; @ Parametric test statistic @
+        
+        p = 4*int((T/100)^(1/4)); @ Maximum order of the VAR(p) model @
+        
+        if p == 0;
+            goto forp0;
+        endif;
+        
+        m_bic = zeros(p, 1); @ Matrix to store the BIC criterion @
+        
+        i=1;
+        do until i > p; @ Loop to select the order of the VAR model using the BIC criterion @
+            
+            Yc_lag=lag(Yc); @ First lagged regressors @
+            D_Yc=Yc-Yc_lag; @ First difference @
+            D_Yc_lag=lag(D_Yc); @ First lagged difference @
+            
+            j=2;
+            do until j>i;
+                D_Yc_lag=D_Yc_lag~lagn(D_Yc, j);
+                j=j+1;
+            endo;
+            
+            temp=trimr(D_Yc~D_Yc_lag, p+1, 0);
+            
+            m_beta=zeros((cols(temp)-cols(D_Yc)), cols(D_Yc)); @ Matrix to store the autoregressive coefficients @
+            m_res=zeros(rows(temp), cols(D_Yc)); @ Matrix to store the residuals @
+            j=1;
+            do until j>cols(D_Yc); @ Loop to estimate each equation in the VAR system by OLS @
+                m_beta[., j]=temp[., j]/temp[., cols(D_Yc)+1:cols(temp)]; @ Estimate the parameters by OLS @
+                m_res[., j]=temp[., j]-temp[., cols(D_Yc)+1:cols(temp)]*m_beta[., j]; @ Compute the OLS-residuals @
+                j=j+1;
+            endo;
+            
+            Det_omega = (1/(T-cols(m_beta)))*det(m_res'*m_res); @ Determinant of the matrix of covariances @
+            l = (-T/2)*(cols(Yc)*(1+ln(2*pi))+ln(det_omega)); @ Log-likelihood @
+            m_BIC[i] = -2*l/T + (cols(Yc)^2*rows(m_beta))*ln(T)/T; @ BIC information criterion @
+            
+            i=i+1;
+        endo;
+        
+        Det_omega = (1/(T-1))*det(D_Yc'*D_Yc); @ Determinant of the matrix of covariances @
+        l = (-T/2)*(cols(Yc)*(1+ln(2*pi))+ln(det_omega)); @ Log-likelihood @
+        temp = -2*l/T; @ BIC information criterion for p = 0 !!!!!! @
+        
+        p = minindc(temp|m_bic)-1; @ Selected order of the VAR model @
+        
+        forp0:
+            
+            if p > 0;
+            
+            Yc_lag=lag(Yc); @ First lagged regressors @
+            D_Yc=Yc-Yc_lag; @ First difference @
+            D_Yc_lag=lag(D_Yc); @ First lagged difference @
+            
+            j=2;
+            do until j>p;
+                D_Yc_lag=D_Yc_lag~lagn(D_Yc, j);
+                j=j+1;
+            endo;
+            
+            temp=trimr(D_Yc~D_Yc_lag, p+1, 0);
+            
+            m_beta=zeros((cols(temp)-cols(D_Yc)), cols(D_Yc)); @ Matrix to store the autoregressive coefficients @
+            m_res=zeros(rows(temp), cols(D_Yc)); @ Matrix to store the residuals @
+            j=1;
+            do until j>cols(D_Yc); @ Loop to estimate each equation in the VAR system by OLS @
+                m_beta[., j]=temp[., j]/temp[., cols(D_Yc)+1:cols(temp)]; @ Estimate the parameters by OLS @
+                m_res[., j]=temp[., j]-temp[., cols(D_Yc)+1:cols(temp)]*m_beta[., j]; @ Compute the OLS-residuals @
+                j=j+1;
+            endo;
+            
+            
+            @++++++++++++++++++++++++++++++++++++++++++@
+            @ Now we filter out the short-run dynamics @
+            @++++++++++++++++++++++++++++++++++++++++++@
+            
+            j=2;
+            do until j>p;
+                Yc_lag=Yc_lag~lagn(Yc, j);
+                j=j+1;
+            endo;
+            
+            temp=trimr(Yc~Yc_lag, p, 0);
+            m_res=zeros(rows(temp), cols(Yc)); @ Matrix to store the residuals @
+            j=1;
+            do until j>cols(Yc); @ Loop to estimate each equation in the VAR system by OLS @
+                m_res[., j]=temp[., j]-temp[., cols(Yc)+1:cols(temp)]*m_beta[., j]; @ Compute the OLS-residuals @
+                j=j+1;
+            endo;
+            
+            Yc_filtered=m_res;
+            
+        elseif p == 0;
+            
+            Yc_filtered=Yc;
+            
+        endif;
+        
+        PHI_c = (1/2)*(Yc_filtered[2:rows(Yc_filtered), .]'*Yc_filtered[1:rows(Yc_filtered)-1, .]+Yc_filtered[1:rows(Yc_filtered)-1, .]'*Yc_filtered[2:rows(Yc_filtered), .])
+            *invpd(Yc_filtered[1:rows(Yc_filtered)-1, .]'*Yc_filtered[1:rows(Yc_filtered)-1, .]);
+        
+        {u, s, v} = svd1(phi_c);
+        
+        v_c = s[rows(s), cols(s)]; @ The smallest eigenvalue of PHI_c @
+        MQ = T*(v_c-1);
+        
+        if (r_star > 0) and (MQ < critical_values[r_star, 2]); @ We make the inference at the 5% level of significance @
+            r_star = r_star-1;
+            if r_star > 0;
+                goto inici;
+            else;
+                goto theend;
+            endif;
+        endif;
+        
+    endif;
+    
+    theend:
+        
+        retp(MQ, r_star);
+endp;
+
+
+
+
+/*
+** Procedure to compute the MQ tests proposed in Bai and Ng (2004,  Econometrica)
+**
+**      Sintaxis:
+**
+**          {MQtest,  r_star} = MQ_test(F, model, N);
+**
+**      Input:
+**
+**          F       (Txr)-matrix of detrended common factors. These common factors are the detrended common factors!!!!!
+**
+**          model   Scalar,  indicates the model that is used and defines the set of critical values that are used
+**
+**          N       Number of individuals from which the common factors have been extracted
+**
+**      Output:
+**
+**          MQtest  Scalar,  the value of the test statistic.
+**
+**          r_star  Estimated number of stochastic common trends.
+**
+**      (c) 2005 Josep Lluís Carrion-i-Silvestre
+**              Department of Econometrics
+**              University of Barcelona
+*/
+
+proc(2)=MQ_test_c(F, model, n);
+    
+    local r,  T,  temp,  u_F,  s_F,  v_F,  r_star,  Yc,  p,  Yc_lag,  j,  m_beta,  m_res,  sigma,  bigJ,  phi_c,  u,  s,  v,  v_c,  MQ,  critical_values;
+    local D_Yc,  D_Yc_lag,  Yc_filtered,  i,  l,  Det_omega,  m_bic;
+    
+    r = cols(F); @ Number of factors @
+    T = rows(F); @ Number of time observations @
+    
+    if model[1] == 1 or model[1] ==3 or model[1] == 6; @ Constant case @
+        critical_values = { -20.151 -13.730 -11.022, 
+            -31.621 -23.535 -19.923, 
+            -41.064 -32.296 -28.399, 
+            -48.501 -40.442 -36.592, 
+            -58.383 -48.617 -44.111, 
+            -66.978 -57.040 -52.312}; @ Bai and Ng (2004),  Table I @
+        
+    elseif model[1] == 2 or model[1] ==4 or model[1] == 7; @ Trend case @
+        critical_values = { -29.246 -21.313 -17.829, 
+            -38.619 -31.356 -27.435, 
+            -50.019 -40.180 -35.685, 
+            -58.140 -48.421 -44.079, 
+            -64.729 -55.818 -55.286, 
+            -74.251 -64.393 -59.555}; @ Bai and Ng (2004),  Table I @
+    elseif model[1] == 5 or model[1] == 8;
+        
+        /*
+        temp = model[2]; @ Break fraction parameter @
+        
+        if (0 < temp) and (temp <= 0.15);
+        
+        critical_values = { -32.163	-23.629	-19.865, 
+        -43.372	-34.321	-30.056, 
+        -53.648	-44.378	-39.748, 
+        -63.359	-53.470	-48.595, 
+        -73.691	-62.796	-57.434, 
+        -81.346	-71.238	-65.663};
+        
+        elseif (0.15 < temp) and (temp <= 0.25);
+        
+        critical_values = { -34.858	-26.091	-22.144, 
+        -46.436	-37.139	-32.688, 
+        -55.828	-46.232	-41.766, 
+        -65.206	-55.582	-50.645, 
+        -74.601	-64.165	-59.199, 
+        -83.575	-72.562	-67.309};
+        
+        elseif (0.25 < temp) and (temp <= 0.35);
+        
+        critical_values = { -36.123	-27.562	-23.619, 
+        -46.773	-37.778	-33.492, 
+        -57.136	-47.511	-42.775, 
+        -65.570	-55.883	-51.370, 
+        -75.573	-64.731	-59.919, 
+        -83.921	-73.247	-67.908};
+        
+        elseif (0.35 < temp) and (temp <= 0.45);
+        
+        critical_values = { -36.635	-28.147	-24.140, 
+        -47.134	-38.391	-34.282, 
+        -57.176	-47.642	-43.088, 
+        -67.481	-56.958	-52.039, 
+        -75.603	-65.386	-60.204, 
+        -84.718	-73.703	-68.372};
+        
+        elseif (0.45 < temp) and (temp <= 0.55);
+        
+        critical_values = { -36.775	-28.226	-24.419, 
+        -48.148	-38.907	-34.553, 
+        -56.753	-47.715	-43.333, 
+        -65.752	-56.418	-51.708, 
+        -75.378	-65.302	-60.251, 
+        -83.902	-73.746	-68.222};
+        
+        elseif (0.55 < temp) and (temp <= 0.65);
+        
+        critical_values = { -36.805	-28.178	-24.176, 
+        -47.611	-38.587	-34.246, 
+        -57.230	-47.865	-43.200, 
+        -67.094	-56.599	-51.785, 
+        -75.182	-64.986	-60.057, 
+        -84.059	-73.136	-67.973};
+        
+        elseif (0.65 < temp) and (temp <= 0.75);
+        
+        critical_values = { -36.302	-27.751	-23.890, 
+        -47.383	-38.223	-34.045, 
+        -56.908	-47.282	-42.693, 
+        -66.869	-56.270	-51.337, 
+        -75.074	-64.828	-59.867, 
+        -85.434	-73.646	-68.332};
+        
+        elseif (0.75 < temp) and (temp <= 0.85);
+        
+        critical_values = { -35.249	-26.722	-22.713, 
+        -46.572	-37.227	-33.085, 
+        -55.960	-46.442	-41.998, 
+        -65.833	-55.750	-50.890, 
+        -74.046	-64.430	-59.290, 
+        -83.244	-72.857	-67.721};
+        
+        elseif (0.85 < temp) and (temp < 1);
+        
+        critical_values = { -32.918	-24.712	-20.896, 
+        -43.959	-35.248	-31.190, 
+        -54.568	-45.183	-40.623, 
+        -63.920	-53.985	-49.399, 
+        -74.177	-63.063	-57.839, 
+        -82.664	-71.518	-66.449};
+        
+        endif;
+        */
+        
+        
+        if T<=75;
+            
+            critical_values = {	-31.046	-24.828	-21.669, 
+                -38.827	-32.792	-29.925, 
+                -44.744	-39.703	-36.641, 
+                -47.752	-44.865	-42.381, 
+                -48.756	-47.472	-46.119, 
+                -48.890	-48.444	-47.879};
+        elseif (75<T) and (T<=200);
+            
+            critical_values = {	-34.474	-26.833	-23.102, 
+                -44.748	-36.464	-32.729, 
+                -53.423	-45.879	-41.862, 
+                -61.972	-53.251	-49.284, 
+                -69.033	-61.099	-56.747, 
+                -74.663	-67.183	-63.437};
+        elseif T>200;
+            
+            critical_values = {	-32.985	-25.697	-22.843, 
+                -46.953	-38.103	-33.778, 
+                -52.827	-45.066	-41.136, 
+                -59.494	-53.392	-49.240, 
+                -70.495	-62.404	-57.440, 
+                -78.589	-68.748	-64.459};
+            
+        endif;
+        
+        
+        
+    endif;
+    
+    
+    temp = T^(-2)*F'*F;
+    
+    {u_F, s_F, v_F} = svd1(temp);
+    
+    r_star = r; @ Initial number of common trends (the dimension of F) @
+    
+    inici:
+        
+        Yc = F*u_F[., 1:r_star];
+    
+    
+    @++++++++++++++++++++++++++@
+    @ Non-parametric statistic @
+    @++++++++++++++++++++++++++@
+    
+    p=1; @ Order of the VAR model @
+    Yc_lag=lag(Yc); @ First lagged regressors @
+    
+    temp=trimr(Yc~Yc_lag, p, 0);
+    m_beta=zeros(p*(cols(temp)-cols(Yc)), cols(Yc)); @ Matrix to store the autoregressive coefficients @
+    m_res=zeros(rows(temp), cols(Yc)); @ Matrix to store the residuals @
+    j=1;
+    do until j>cols(Yc); @ Loop to estimate each equation in the VAR system by OLS @
+        m_beta[., j]=temp[., j]/temp[., cols(Yc)+1:cols(temp)]; @ Estimate the parameters by OLS @
+        m_res[., j]=temp[., j]-temp[., cols(Yc)+1:cols(temp)]*m_beta[., j]; @ Compute the OLS-residuals @
+        j=j+1;
+    endo;
+    
+    sigma=0;
+    
+    bigJ = 4*ceil((minc(T|n)/100)^(1/4));
+    j=1;
+    do until j>bigJ;
+        sigma = sigma + (1-j/(bigJ+1))*T^(-1)*m_res[1:rows(m_res)-j, .]'*m_res[j+1:rows(m_res), .];
+        j=j+1;
+    endo;
+    
+    PHI_c = (1/2)*(Yc[2:rows(Yc), .]'*Yc[1:rows(Yc)-1, .]+Yc[1:rows(Yc)-1, .]'*Yc[2:rows(Yc), .]-T*(sigma+sigma'))
+        *invpd(Yc[1:rows(Yc)-1, .]'*Yc[1:rows(Yc)-1, .]);
+    
+    {u, s, v} = svd1(phi_c);
+    
+    v_c = s[rows(s), cols(s)]; @ The smallest eigenvalue of PHI_c @
+    MQ = T*(v_c-1);
+    
+    
+    @ We make the inference about the number of stochastic trends @
+    
+    if (r_star > 0) and (MQ < critical_values[r_star, 2]); @ We make the inference at the 5% level of significance @
+        r_star = r_star-1;
+        if r_star > 0;
+            goto inici;
+        else;
+            goto theend;
+        endif;
+    endif;
+    
+    theend:
+        
+        retp(MQ, r_star);
+endp;
+
+/*
+** Procedure to compute the common factors 
+**
+** Sintaxis:
+**
+**      {e, Fhat, csi, m_tbe} = factcoint_msb(y,x,model,m_Tb,k);
+**
+** Input:
+**
+**      y       (TxN)-matrix of endogenous variables
+**
+**      x       (Tx(kreg*N))-matrix of stochastic regressors
+**
+**      model   (2x1) vector, denotes the deterministic model in the first position:
+**
+**              model[1] = 1 for the individual effects model (Pedroni model),
+**              model[1] = 2 for the individual and time effects model (Pedroni model),
+**              model[1] = 3 for the individual effects and one level shift model (no break in the cointegrating vector),
+**              model[1] = 4 for the individual and time effects and one level shift (no break in the cointegrating vector),
+**              model[1] = 5 for the individual and time effects, with both level and slope shift (no break in the cointegrating vector),
+**              model[1] = 6 for the individual effects, with both level and cointegrating vector shift,
+**              model[1] = 7 for the individual and time effects, with both level (no trend shift) and cointegrating vector shift,
+**              model[1] = 8 for the individual and time effects, with all level, time trend and cointegrating vector shift.
+**
+**              and whether the structural break points are known or not:
+**
+**              model[2]=0 for the known break points case
+**              model[2]=1 for the unknown break points case
+**
+**      m_Tb    (Nxm)-vector of estimated break points; m_Tb = 0 if there are no structural breaks.
+**
+**      k       (2x1)-vector for the common factors
+**
+**              k[1] scalar, with the maximum number of common factors
+**
+**              k[2] = 0 if the number of common factors is known
+**                   = 1 if the number of common factors is unknown
+**
+** Output:
+**
+**      e       (T-1xN)-matrix of idiosyncratic disturbance terms.
+**
+**      Fhat    (T-1 x r)-matrix of common factors.
+**
+**		csi			(N x r)-matrix of factor loadings.
+**
+**		m_tbe		N-vector of estimated breaks.
+**
+**	m_tbe	(Nx1)-vector of estimated break points.
+**
+**
+**      (c) 2006 Josep Lluís Carrion-i-Silvestre
+**              Department of Econometrics
+**              University of Barcelona
+*/
+
+proc(4)=factcoint_msb(y,x,model,m_Tb,k);
+
+    local t, n, kreg, n_breaks, temp, D_res_coin, i, y_i, x_i, j, jj, jjj, Dy_i, Dx_i, beta, DTb, DTb1, DTb2, dudx, du, du1, du2;
+    local u, s, v, csi, fhat, De, e, CT, sigma, IC1;
+    local SSR, m_tbe, temp_SSR, distance;
+
+    T=rows(y); @ Sample size @
+    N=cols(y); @ Number of individuals @
+    kreg=cols(x)/N; @ Number of regressors @
+    n_breaks=cols(m_Tb); @ Number of structural breaks @ 
+
+    D_res_coin=zeros(T-1,N);
+
+    SSR=zeros((int(0.85*t)-int(0.15*t)+1)*(int(0.85*t)-int(0.15*t))/2-(int(0.85*t)-int(0.15*t)+1)+1,n);
+
+    i=1;
+    do until i>n;
+
+        y_i=y[.,i]; @ Endogenous variable @
+        x_i = x[.,i]; @ First exogenous variable @
+
+        if kreg > 1; @ Select the additional stochastic regressors if necessary @
+            j = 2;
+            do until j>kreg;
+                x_i=x_i~x[.,i+(j-1)*N]; @ Additional regressors @
+                j=j+1;
+            endo;
+        endif;
+
+        Dy_i=y_i[2:t,.]-y_i[1:t-1,.];
+        Dx_i=x_i[2:t,.]-x_i[1:t-1,.];
+
+
+        if model[2] == 0; @ known breaks @
+	        if model[1] == 1; @ Fixed effects model's specification @
+	            beta=Dy_i/Dx_i;
+	            D_res_coin[.,i]=Dy_i-Dx_i*beta;
+	            m_tbe=0;
+	        elseif model[1] == 2; @ Fixed and time effects model's specification @
+	            beta=Dy_i/(ones(T-1,1)~Dx_i);
+	            D_res_coin[.,i]=Dy_i-(ones(T-1,1)~Dx_i)*beta;
+	            m_tbe=0;
+	        elseif model[1] == 3; @ Fixed effects and level shifts @
+	            DTb=zeros(T,n_breaks);
+                j=1;
+                do until j>n_breaks;
+    	            Dtb[m_tb[i,j]+1,j]=1;
+                    j=j+1;
+                endo;
+	            beta=Dy_i/(DTb[2:t,.]~Dx_i);
+	            D_res_coin[.,i]=Dy_i-(DTb[2:t,.]~Dx_i)*beta;
+	            m_tbe=m_tb;
+	        elseif model[1] == 4; @ Fixed and time effects and level shift @
+	            DTb=zeros(T,n_breaks);
+                j=1;
+                do until j>n_breaks;
+    	            Dtb[m_tb[i,j]+1,j]=1;
+                    j=j+1;
+                endo;
+	            beta=Dy_i/(ones(T-1,1)~DTb[2:t,.]~Dx_i);
+	            D_res_coin[.,i]=Dy_i-(ones(T-1,1)~DTb[2:t,.]~Dx_i)*beta;
+	            m_tbe=m_tb;
+	        elseif model[1] == 5; @ Fixed and time effects with bothe level and slope shift @
+	            DTb=zeros(T,n_breaks);
+                j=1;
+                do until j>n_breaks;
+    	            Dtb[m_tb[i,j]+1,j]=1;
+                    j=j+1;
+                endo;
+	            du=zeros(m_tb[i,1],1)|ones(t-m_tb[i,1],1);
+                j=2;
+                do until j>n_breaks;
+    	            du=du~(zeros(m_tb[i,j],1)|ones(t-m_tb[i,j],1));
+                    j=j+1;
+                endo;
+	            beta=Dy_i/(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i);
+	            D_res_coin[.,i]=Dy_i-(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i)*beta;
+	            m_tbe=m_tb;
+	        elseif model[1] == 6; @ Fixed effects and level and cointegrating shift @
+	            DTb=zeros(T,n_breaks);
+                j=1;
+                do until j>n_breaks;
+    	            Dtb[m_tb[i,j]+1,j]=1;
+                    j=j+1;
+                endo;
+	            du=zeros(m_tb[i,1],1)|ones(t-m_tb[i,1],1);
+                j=2;
+                do until j>n_breaks;
+    	            du=du~(zeros(m_tb[i,j],1)|ones(t-m_tb[i,j],1));
+                    j=j+1;
+                endo;
+	            dudx=du[.,1].*x_i;
+	            dudx=dudx[2:t,.]-dudx[1:t-1,.];
+                j=2;
+                do until j>n_breaks;
+                    temp=du[.,j].*x_i;
+    	            dudx=dudx~(temp[2:t,.]-temp[1:t-1,.]);
+                    j=j+1;
+                endo;
+	            beta=Dy_i/(DTb[2:t,.]~Dx_i~dudx);
+	            D_res_coin[.,i]=Dy_i-(DTb[2:t,.]~Dx_i~dudx)*beta;
+	            m_tbe=m_tb;
+	        elseif model[1] == 7; @ Fixed and time effects, and level and cointegrating shift @
+	            DTb=zeros(T,n_breaks);
+                j=1;
+                do until j>n_breaks;
+    	            Dtb[m_tb[i,j]+1,j]=1;
+                    j=j+1;
+                endo;
+	            du=zeros(m_tb[i,1],1)|ones(t-m_tb[i,1],1);
+                j=2;
+                do until j>n_breaks;
+    	            du=du~(zeros(m_tb[i,j],1)|ones(t-m_tb[i,j],1));
+                    j=j+1;
+                endo;
+	            dudx=du[.,1].*x_i;
+	            dudx=dudx[2:t,.]-dudx[1:t-1,.];
+                j=2;
+                do until j>n_breaks;
+                    temp=du[.,j].*x_i;
+    	            dudx=dudx~(temp[2:t,.]-temp[1:t-1,.]);
+                    j=j+1;
+                endo;
+	            beta=Dy_i/(ones(T-1,1)~DTb[2:t,.]~Dx_i~dudx);
+	            D_res_coin[.,i]=Dy_i-(ones(T-1,1)~DTb[2:t,.]~Dx_i~dudx)*beta;
+	            m_tbe=m_tb;
+	        elseif model[1] == 8; @ Fixed and time effects, and level, time trend and cointegrating shift @
+	            DTb=zeros(T,n_breaks);
+                j=1;
+                do until j>n_breaks;
+    	            Dtb[m_tb[i,j]+1,j]=1;
+                    j=j+1;
+                endo;
+	            du=zeros(m_tb[i,1],1)|ones(t-m_tb[i,1],1);
+                j=2;
+                do until j>n_breaks;
+    	            du=du~(zeros(m_tb[i,j],1)|ones(t-m_tb[i,j],1));
+                    j=j+1;
+                endo;
+	            dudx=du[.,1].*x_i;
+	            dudx=dudx[2:t,.]-dudx[1:t-1,.];
+                j=2;
+                do until j>n_breaks;
+                    temp=du[.,j].*x_i;
+    	            dudx=dudx~(temp[2:t,.]-temp[1:t-1,.]);
+                    j=j+1;
+                endo;
+	            beta=Dy_i/(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i~dudx);
+	            D_res_coin[.,i]=Dy_i-(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i~dudx)*beta;
+	            m_tbe=m_tb;           
+	        endif;
+	        
+	    elseif model[2]==1; @ unknown breaks @
+	
+	        if model[1] == 1; @ Fixed effects model's specification @
+	            beta=Dy_i/Dx_i;
+	            D_res_coin[.,i]=Dy_i-Dx_i*beta;
+	            m_tbe=0;
+	        elseif model[1] == 2; @ Fixed and time effects model's specification @
+	            beta=Dy_i/(ones(T-1,1)~Dx_i);
+	            D_res_coin[.,i]=Dy_i-(ones(T-1,1)~Dx_i)*beta;
+	            m_tbe=0;
+	        elseif model[1] == 3; @ Fixed effects and level shift @
+	        	SSR=1e46;
+                distance=int(0.15*t);
+	        	j=int(0.15*t);
+	        	do until j>int(0.85*t)-distance;
+                    DTb1=zeros(T,1);
+                    DTb1[j+1]=1;
+                    jj=j+distance;
+                    do until jj>int(0.85*t);
+                        DTb2=zeros(T,1);
+                        DTb2[jj+1]=1;
+                        DTb=DTb1~DTb2;
+    		            beta=Dy_i/(DTb[2:t,.]~Dx_i);
+    		            if (Dy_i-(DTb[2:t,.]~Dx_i)*beta)'(Dy_i-(DTb[2:t,.]~Dx_i)*beta) < SSR;
+    		            	D_res_coin[.,i]=Dy_i-(DTb[2:t,.]~Dx_i)*beta;
+    		            	m_Tb[i,.]=j~jj;
+    		            	SSR=(Dy_i-(DTb[2:t,.]~Dx_i)*beta)'(Dy_i-(DTb[2:t,.]~Dx_i)*beta);            	
+    		            endif;
+                        jj=jj+1;
+                    endo;
+            	    j=j+1;
+            	endo;
+	        elseif model[1] == 4; @ Fixed and time effects and level shift @
+	        	SSR=1e46;
+                distance=int(0.15*t);
+	        	j=int(0.15*t);
+	        	do until j>int(0.85*t)-distance;
+
+                    DTb1=zeros(T,1);
+                    DTb1[j+1]=1;
+
+                    jj=j+distance;
+                    do until jj>int(0.85*t);
+                        DTb2=zeros(T,1);
+                        DTb2[jj+1]=1;
+
+                        DTb=DTb1~DTb2;
+    		            beta=Dy_i/(ones(T-1,1)~DTb[2:t,.]~Dx_i);
+    		            if (Dy_i/(ones(T-1,1)~DTb[2:t,.]~Dx_i))'(Dy_i/(ones(T-1,1)~DTb[2:t,.]~Dx_i)) < SSR;
+    		            	D_res_coin[.,i]=Dy_i-(ones(T-1,1)~DTb[2:t,.]~Dx_i)*beta;
+    		            	m_Tb[i,.]=j~jj;
+    		            	SSR=(Dy_i/(ones(T-1,1)~DTb[2:t,.]~Dx_i))'(Dy_i/(ones(T-1,1)~DTb[2:t,.]~Dx_i));
+    		            endif;
+                        jj=jj+1;
+                    endo;
+                    j=j+1;
+                endo;
+
+	        elseif model[1] == 5; @ Fixed and time effects with both the level and slope shift @
+                temp_SSR=0;
+                distance=int(0.15*t);
+	        	j=int(0.15*t);
+	        	do until j>int(0.85*t)-distance;
+                    DTb1=zeros(T,1);
+                    DTb1[j+1]=1;
+                    du1=zeros(j,1)|ones(t-j,1);
+                    temp=0;
+                    jj=j+distance;
+                    do until jj>int(0.85*t);
+                        DTb2=zeros(T,1);
+                        DTb2[jj+1]=1;
+                        DTb=DTb1~DTb2;
+                        du2=zeros(jj,1)|ones(t-jj,1);
+                        du=du1~du2;
+    		            beta=Dy_i/(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i);
+                        temp=temp|(Dy_i-(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i)*beta)'(Dy_i-(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i)*beta);
+                        jj=jj+1;
+                    endo;
+                    temp=temp[2:rows(temp)];
+                    temp_SSR=temp_SSR|temp;
+                    j=j+1;
+                endo;
+                SSR[.,i]=temp_SSR[2:rows(temp_SSR)];
+
+	        elseif model[1] == 6; @ Fixed effects and level and cointegrating shift @
+	        	SSR=1e46;
+                distance=int(0.15*t);
+	        	j=int(0.15*t);
+	        	do until j>int(0.85*t)-distance;
+                    DTb1=zeros(T,1);
+                    DTb1[j+1]=1;
+                    du1=zeros(j,1)|ones(t-j,1);
+                    jj=j+distance;
+                    do until jj>int(0.85*t);
+                        DTb2=zeros(T,1);
+                        DTb2[jj+1]=1;
+                        DTb=DTb1~DTb2;
+                        du2=zeros(jj,1)|ones(t-jj,1);
+                        du=du1~du2;
+        	            dudx=du[.,1].*x_i;
+                        jjj=2;
+                        do until j>n_breaks;
+            	            dudx=dudx~du[.,jjj].*x_i;
+                            jjj=jjj+1;
+                        endo;
+        	            dudx=dudx[2:t,.]-dudx[1:t-1,.];
+    		            beta=Dy_i/(DTb[2:t,.]~Dx_i~dudx);
+    		            if (Dy_i-(DTb[2:t,.]~Dx_i~dudx)*beta)'(Dy_i-(DTb[2:t,.]~Dx_i~dudx)*beta) < SSR;
+    		            	D_res_coin[.,i]=Dy_i-(DTb[2:t,.]~Dx_i~dudx)*beta;
+    		            	m_Tb[i,.]=j~jj;
+    		            	SSR=(Dy_i-(DTb[2:t,.]~Dx_i~dudx)*beta)'(Dy_i-(DTb[2:t,.]~Dx_i~dudx)*beta);
+    		            endif;
+                        jj=jj+1;
+                    endo;
+                    j=j+1;
+                endo;
+
+	        elseif model[1] == 7; @ Fixed and time effects, and level and cointegrating shift @
+	        	SSR=1e46;
+                distance=int(0.15*t);
+	        	j=int(0.15*t);
+	        	do until j>int(0.85*t)-distance;
+                    DTb1=zeros(T,1);
+                    DTb1[j+1]=1;
+                    du1=zeros(j,1)|ones(t-j,1);
+                    jj=j+distance;
+                    do until jj>int(0.85*t);
+                        DTb2=zeros(T,1);
+                        DTb2[jj+1]=1;
+                        DTb=DTb1~DTb2;
+                        du2=zeros(jj,1)|ones(t-jj,1);
+                        du=du1~du2;
+        	            dudx=du[.,1].*x_i;
+                        jjj=2;
+                        do until j>n_breaks;
+            	            dudx=dudx~du[.,jjj].*x_i;
+                            jjj=jjj+1;
+                        endo;
+        	            dudx=dudx[2:t,.]-dudx[1:t-1,.];
+    		            beta=Dy_i/(ones(T-1,1)~DTb[2:t,.]~Dx_i~dudx);
+    		            if (Dy_i-(ones(T-1,1)~DTb[2:t,.]~Dx_i~dudx)*beta)'(Dy_i-(ones(T-1,1)~DTb[2:t,.]~Dx_i~dudx)*beta) < SSR;
+    		            	D_res_coin[.,i]=Dy_i-(ones(T-1,1)~DTb[2:t,.]~Dx_i~dudx)*beta;
+    		            	m_Tb[i,.]=j~jj;
+    		            	SSR=(Dy_i-(ones(T-1,1)~DTb[2:t,.]~Dx_i~dudx)*beta)'(Dy_i-(ones(T-1,1)~DTb[2:t,.]~Dx_i~dudx)*beta);
+    		            endif;
+                        jj=jj+1;
+                    endo;
+                    j=j+1;
+                endo;
+
+	        elseif model[1] == 8; @ Fixed and time effects, and level, time trend and cointegrating shift @
+                temp_SSR=0;
+                distance=int(0.15*t);
+	        	j=int(0.15*t);
+	        	do until j>int(0.85*t)-distance;
+                    DTb1=zeros(T,1);
+                    DTb1[j+1]=1;
+                    du1=zeros(j,1)|ones(t-j,1);
+                    temp=0;
+                    jj=j+distance;
+                    do until jj>int(0.85*t);
+                        DTb2=zeros(T,1);
+                        DTb2[jj+1]=1;
+                        DTb=DTb1~DTb2;
+                        du2=zeros(jj,1)|ones(t-jj,1);
+                        du=du1~du2;
+        	            dudx=du[.,1].*x_i;
+                        jjj=2;
+                        do until j>n_breaks;
+            	            dudx=dudx~du[.,jjj].*x_i;
+                            jjj=jjj+1;
+                        endo;
+        	            dudx=dudx[2:t,.]-dudx[1:t-1,.];
+    		            beta=Dy_i/(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i~dudx);
+                        temp=temp|(Dy_i-(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i~dudx)*beta)'(Dy_i-(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i~dudx)*beta);
+                        jj=jj+1;
+                    endo;
+                    temp=temp[2:rows(temp)];
+                    temp_SSR=temp_SSR|temp;
+                    j=j+1;
+                endo;
+                SSR[.,i]=temp_SSR[2:rows(temp_SSR)];
+	        endif;
+
+	    endif;
+
+        i=i+1;
+    endo;
+
+
+
+
+
+    
+    if model[2] == 1;
+
+        if model[1] == 5 or model[1] == 8;
+            temp=zeros(1,2);
+            distance=int(0.15*t);
+        	j=int(0.15*t);
+        	do until j>int(0.85*t)-distance;
+                jj=j+distance;
+                do until jj>int(0.85*t);
+                    temp=temp|(j~jj);
+                    jj=jj+1;
+                endo;
+                j=j+1;
+            endo;
+            temp=temp[2:rows(temp),.];
+            m_tbe=temp[minindc(sumc(ssr')),.]; @ Estimated break points @
+            i=1;
+            do until i>N;
+                y_i=y[.,i]; @ Endogenous variable @
+                x_i = x[.,i]; @ First exogenous variable @
+        
+                if kreg > 1; @ Select the additional stochastic regressors if necessary @
+                    j = 2;
+                    do until j>kreg;
+                        x_i=x_i~x[.,i+(j-1)*N]; @ Additional regressors @
+                        j=j+1;
+                    endo;
+                endif;
+        
+                Dy_i=y_i[2:t,.]-y_i[1:t-1,.];
+                Dx_i=x_i[2:t,.]-x_i[1:t-1,.];
+
+                if model[1] == 5;
+                    DTb1=zeros(T,1);
+                    DTb1[m_tbe[1]+1]=1;
+                    du1=zeros(m_tbe[1],1)|ones(t-m_tbe[1],1);
+                    DTb2=zeros(T,1);
+                    DTb2[m_tbe[2]+1]=1;
+                    du2=zeros(m_tbe[2],1)|ones(t-m_tbe[2],1);
+		            DTb=DTb1~DTb2;
+                    du=du1~du2;
+		            beta=Dy_i/(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i);
+                    D_res_coin[.,i]=Dy_i-(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i)*beta;
+                elseif model[1] == 8;
+                    DTb1=zeros(T,1);
+                    DTb1[m_tbe[1]+1]=1;
+                    du1=zeros(m_tbe[1],1)|ones(t-m_tbe[1],1);
+                    DTb2=zeros(T,1);
+                    DTb2[m_tbe[2]+1]=1;
+                    du2=zeros(m_tbe[2],1)|ones(t-m_tbe[2],1);
+		            DTb=DTb1~DTb2;
+                    du=du1~du2;
+    	            dudx=du[.,1].*x_i~du[.,2].*x_i;
+    	            dudx=dudx[2:t,.]-dudx[1:t-1,.];
+		            beta=Dy_i/(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i~dudx);
+                    D_res_coin[.,i]=Dy_i-(ones(T-1,1)~DTb[2:t,.]~Du[2:t,.]~Dx_i~dudx)*beta;
+                endif;
+
+                i=i+1;
+            endo;
+
+        else;
+
+    	    m_tbe=m_tb;
+
+        endif;
+
+    endif;
+    
+    
+
+	start:
+	if k[1] == 0;
+		De = D_res_coin;
+		e=cumsumc(De);
+		fhat=0;
+		csi=0;
+		goto theend; @ We don't have common factors @
+	endif;
+    
+    
+
+    {u,s,v}=svd1(D_res_coin'*D_res_coin);
+
+    if k[2] == 0; @ Manual selection of the number of factors @
+    	csi=sqrt(n)*u[.,1:k[1]];
+	    fhat=inv(n)*D_res_coin*csi;
+    	De = D_res_coin - fhat*csi';
+	    e=cumsumc(De);
+    elseif k[2] == 1; @ Estimation of the number of factors as in Bai and Ng (2002, Econometrica) @
+	    CT=zeros(k[1],1);
+	    sigma=zeros(k[1],1);
+	    IC1=zeros(k[1],1);
+	    i=1;
+	    do until i>k[1];
+		    CT[i] = ln(N*T/(N+T))*i*(N+T)/(N*T); @ Panel BIC @
+    	    csi=sqrt(n)*u[.,1:i];
+    	    fhat=inv(n)*D_res_coin*csi;
+    	    De = D_res_coin - fhat*csi';
+		    sigma[i] = meanc(sumc(De.*De/T));
+		    IC1[i] = ln(sigma[i]) + CT[i];
+		    i=i+1;
+	    endo;
+	    IC1 = ln(meanc(sumc(D_res_coin.*D_res_coin/T)))|IC1; @ We compute the IC1 for k=0 @
+	    
+	    k[1]=minindc(IC1)-1; @ The estimated number of factors @
+
+	    if k[1] == 0;
+		    goto start; @ We don't have common factors @
+	    endif;
+
+
+     	csi=sqrt(n)*u[.,1:k[1]];
+	    fhat=inv(n)*D_res_coin*csi;
+    	De = D_res_coin - fhat*csi';
+	    e=cumsumc(De);
+    endif;
+
+	theend:
+
+    retp(e,cumsumc(fhat),csi,m_tbe);
+endp; 
