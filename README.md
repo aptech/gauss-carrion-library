@@ -1,7 +1,7 @@
 # gauss-carrion-library
 
 ## What is GAUSS?
-GAUSS is an easy-to-use data analysis, mathematical and statistical environment based on the powerful, fast and efficient GAUSS Matrix Programming Language. GAUSS is a complete analysis environment with the built-in tools you need for estimation, forecasting, simulation, visualization and more.
+**GAUSS** is an easy-to-use data analysis, mathematical and statistical environment based on the powerful, fast and efficient **GAUSS Matrix Programming Language**. **GAUSS** is a complete analysis environment with the built-in tools you need for estimation, forecasting, simulation, visualization and more.
 
 ## What is the GAUSS carrion library?
 The [**GAUSS**](www.aptech.com) carrion library is a collection of [**GAUSS**](www.aptech.com) codes developed by [Josep Carrion-i-Silvestre](https://webgrec.ub.edu/webpages/personal/ang/000698_carrion.ub.edu.html). The [raw codes](https://webgrec.ub.edu/webpages/personal/ang/000698_carrion.ub.edu.html) provided by Carrion-i-Silvestre have been modified to make use of [**GAUSS**](www.aptech.com) structures.
@@ -11,17 +11,17 @@ The [**GAUSS**](www.aptech.com) carrion library is a collection of [**GAUSS**](w
 The program files require a working copy of [**GAUSS 18+**](www.aptech.com). Many can be run on earlier versions with some small revisions.
 
 ### Installing
-The GAUSS Time Series and Panel data tests can be easily installed using the [**GAUSS Application Installer**](https://www.aptech.com/support/installation/using-the-applications-installer-wizard/), as shown below:
+The GAUSS Carrion library can be easily installed using the [**GAUSS Application Installer**](https://www.aptech.com/support/installation/using-the-applications-installer-wizard/), as shown below:
 
 1. Download the zipped folder `carrionlib.zip`.
 2. Select **Tools > Install Application** from the main **GAUSS** menu.  
 ![install wizard](images/install_application.png)  
 
-3. Follow the installer prompts, making sure to navigate to the downloaded `tspdlib.zip`.
+3. Follow the installer prompts, making sure to navigate to the downloaded `carrionlib.zip`.
 4. Before using the functions created by `carrionlib` you will need to load the newly created `carrionlib` library. This can be done in a number of ways:
-  *   Navigate to the library tool view window and click the small wrench located next to the `carrionlib` library. Select `Load Library`.  
+  *   Navigate to the **Library Tool Window** and click the small wrench located next to the `carrionlib` library. Select `Load Library`.  
   ![load library](images/load_carrionlib.jpg)
-  *  Enter `library carrionlib` in the program input/output window.
+  *  Enter `library carrionlib` in the **Program Input/output Window**.
   *  Put the line `library carrionlib;` at the beginning of your program files.
 
   Note: I have provided the individual files found in `carrionlib.zip` for examination and review. However, installation should always be done using the `carrionlib.zip` folder and the **GAUSS Application Installer**.
