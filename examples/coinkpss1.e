@@ -32,12 +32,12 @@ cCtl.exogenous = 0;
 cCtl.lagsdols = 4; 
           
 // Set model type          
-cCtl.model = 1;  /*   = 1  model An,
-                 2  model A,
-                 3  model B,
-                 4  model C,
-                 5  model D,
-                 6  model E. */
+cCtl.model = 1;  /*  = 1  model An,
+                       2  model A,
+                       3  model B,
+                       4  model C,
+                       5  model D,
+                       6  model E. */
                  
 print "***************************";
 print "Test with known break point";

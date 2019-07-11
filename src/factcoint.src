@@ -83,7 +83,7 @@ proc (5) = factcoint_iter(y, x, model, m_Tb, k, tolerance, max_iter);
         
         diff_SSR = SSR_2 - SSR_opt;
         
-        print "Intermediate results" ssr_opt~ssr_2~diff_ssr;
+        print "Intermediate results " ssr_opt~ssr_2~diff_ssr;
         
         if abs(diff_SSR)>tolerance;
             
@@ -104,8 +104,11 @@ proc (5) = factcoint_iter(y, x, model, m_Tb, k, tolerance, max_iter);
     endo;
     
     theend:
+    
+    // Add space after 'Intermediate results' and subsequent print statements
+    print "";
         
-        {e, Fhat, csi, m_tbe} = factcoint(y, x, model[1]|0, m_tbe_opt, k); @ estimation of the common factors,  assuming the estimated breaks as known @
+    {e, Fhat, csi, m_tbe} = factcoint(y, x, model[1]|0, m_tbe_opt, k); @ estimation of the common factors,  assuming the estimated breaks as known @
     
     retp(e, Fhat, csi, m_tbe_opt, i);
     

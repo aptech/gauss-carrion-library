@@ -3,19 +3,19 @@ cls;
 library carrionlib;
 
 /*
-** Load results matrices from 
-** factcoint
+** Load the factor matrix;
+** the result matrix from factcoint
+** Note: __FILE_DIR returns the folder
+**       containing this file.
 */
-loadm fhat;
+fname = __FILE_DIR $+ "fhat.fmt";
+fhat = loadd(fname);
 
 // Specify model;
 model = 4;
 
 // Count
 N = 63;
-
-// Load factor matrix
-loadm fhat;
 
 /*
 ** Matrix to store the non-parametric test to estimate

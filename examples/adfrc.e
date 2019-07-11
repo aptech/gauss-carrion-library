@@ -6,7 +6,9 @@ library carrionlib;
 ** Load results matrices from 
 ** factcoint
 */
-loadm fhat, mat_e_idio, csi;
+fhat = loadd(__FILE_DIR $+ "fhat.fmt");
+mat_e_idio = loadd(__FILE_DIR $+ "mat_e_idio.fmt");
+csi = loadd(__FILE_DIR $+ "csi.fmt");
 
 /* 
 ** Method to correct for the autoregressive squemes.

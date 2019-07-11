@@ -2,13 +2,17 @@ new;
 cls;
 library carrionlib;
 
-// Load data
-year  = loadd("year_month.dat",  "year");
-month  = loadd("year_month.dat",  "month");
+/*
+** Load data
+** Note: __FILE_DIR returns the folder
+**       containing this file.
+*/
+year = loadd(__FILE_DIR $+ "year_month.dat",  "year");
+month = loadd(__FILE_DIR $+ "year_month.dat",  "month");
 
-lpm = loadd("lpm.dat");
-lfp = loadd("lfp.dat");
-e = loadd("e.dat");
+lpm = loadd(__FILE_DIR $+ "lpm.dat");
+lfp = loadd(__FILE_DIR $+ "lfp.dat");
+e = loadd(__FILE_DIR $+ "e.dat");
 
 @+++++++++++++++++++++++++++++++++++++++++++++++++++++@
 @ Estimation of the model allowing for common factors @

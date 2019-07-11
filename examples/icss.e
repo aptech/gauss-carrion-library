@@ -1,6 +1,6 @@
 /*****************************************
 * Replicates the emprirical aplication in
-* Sanso, Aragó & Carrion (2002): "Testing for changes in the unconditional 
+* Sanso, AragÃ³ & Carrion (2002): "Testing for changes in the unconditional 
 * variance of financial time series"
 *
 *****************************************/
@@ -18,10 +18,14 @@ cls;
 */
 cri = { 1, 1 };
 cri = cri|4;
- 
-// Load the "Han" data (521 observations)
-"HAN";
-load x[521, 1] = han.dat;
+
+/*
+** Load data the "Han" data (521 observations)
+** Note: __FILE_DIR returns the folder
+**       containing this file.
+*/
+print "HAN";
+x = csvReadM(__FILE_DIR $+ "han.dat");
 
 // Demean data
 e = x - meanc(x);
@@ -29,7 +33,7 @@ e = x - meanc(x);
 /*
 ** Set to use Inclant-Tiao test
 */
-test=0;
+test = 0;
 
 // Call icss test
 { cpr, nbr } = icss(e, test, cri);
@@ -166,8 +170,3 @@ test = 2;
 { cpr, nbr } = icss(e, test, cri);
 print "Number of breaks" nbr;
 print "Break positions" cpr';
-
-
-
-
-
