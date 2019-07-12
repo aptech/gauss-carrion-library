@@ -67,8 +67,8 @@ print "Number of breaks" nbr;
 print "Break positions" cpr';
 
 // Load the "SP" data (521 observations)
-load x[521, 1] = sp.dat;
-"SP";
+x = csvReadM(__FILE_DIR $+ "sp.dat");
+print "SP";
 
 // Demean the data
 e = x - meanc(x);
@@ -106,8 +106,8 @@ print "Number of breaks" nbr;
 print "Break positions" cpr';
 
 // Load the "FTSE" data (473 observations)
-load x[473, 1] = ftse.dat;
-"FTSE";
+x = csvReadM(__FILE_DIR $+ "ftse.dat");
+print "FTSE";
 
 // Demean the data
 e = x - meanc(x);
@@ -139,8 +139,8 @@ print "Number of breaks" nbr;
 print "Break positions" cpr';
 
 // Load the "FTSE" data (473 observations)
-load x[466, 1] = nik.dat;
-"NIK";
+print csvReadM(__FILE_DIR $+ "nik.dat");
+print "NIK";
 
 // Demean the data
 e = x - meanc(x);
