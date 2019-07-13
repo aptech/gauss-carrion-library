@@ -24,9 +24,8 @@ The GAUSS Carrion library can be easily installed using the [**GAUSS Application
   *  Enter `library carrionlib` in the **Program Input/output Window**.
   *  Put the line `library carrionlib;` at the beginning of your program files.
 
-::: info
-  Note: I have provided the individual files found in `carrionlib.zip` for examination and review. However, installation should always be done using the `carrionlib.zip` folder and the [**GAUSS Application Installer**](https://www.aptech.com/support/installation/using-the-applications-installer-wizard/).
-:::
+>Note: I have provided the individual files found in `carrionlib.zip` for examination and review. However, installation should always be done using the [`carrionlib.zip` from the release page](https://github.com/aptech/gauss-carrion-library/releases) and the [**GAUSS Application Installer**](https://www.aptech.com/support/installation/using-the-applications-installer-wizard/).
+
 
 ## Authors
 [Erica Clower](mailto:eclower@aptech.com)  
