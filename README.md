@@ -1,7 +1,7 @@
 # gauss-carrion-library
 
 ## What is GAUSS?
-**GAUSS** is an easy-to-use data analysis, mathematical and statistical environment based on the powerful, fast and efficient **GAUSS Matrix Programming Language**. **GAUSS** is a complete analysis environment with the built-in tools you need for estimation, forecasting, simulation, visualization and more.
+[**GAUSS**](www.aptech.com) is an easy-to-use data analysis, mathematical and statistical environment based on the powerful, fast and efficient **GAUSS Matrix Programming Language**. [**GAUSS**](www.aptech.com) is a complete analysis environment with the built-in tools you need for estimation, forecasting, simulation, visualization and more.
 
 ## What is the GAUSS carrion library?
 The [**GAUSS**](www.aptech.com) carrion library is a collection of [**GAUSS**](www.aptech.com) codes developed by [Josep Carrion-i-Silvestre](https://webgrec.ub.edu/webpages/personal/ang/000698_carrion.ub.edu.html). The [raw codes](https://webgrec.ub.edu/webpages/personal/ang/000698_carrion.ub.edu.html) provided by Carrion-i-Silvestre have been modified to make use of [**GAUSS**](www.aptech.com) structures.
@@ -24,7 +24,9 @@ The GAUSS Carrion library can be easily installed using the [**GAUSS Application
   *  Enter `library carrionlib` in the **Program Input/output Window**.
   *  Put the line `library carrionlib;` at the beginning of your program files.
 
-  Note: I have provided the individual files found in `carrionlib.zip` for examination and review. However, installation should always be done using the `carrionlib.zip` folder and the **GAUSS Application Installer**.
+::: info
+  Note: I have provided the individual files found in `carrionlib.zip` for examination and review. However, installation should always be done using the `carrionlib.zip` folder and the [**GAUSS Application Installer**](https://www.aptech.com/support/installation/using-the-applications-installer-wizard/).
+:::
 
 ## Authors
 [Erica Clower](mailto:eclower@aptech.com)  
