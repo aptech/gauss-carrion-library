@@ -1,5 +1,5 @@
 /* GAUSS routines for computing the ICSS algorithm with the tests proposed in:
-** Sanso, Aragó & Carrion (2002): "Testing for changes in the unconditional
+** Sanso, AragÃ³ & Carrion (2002): "Testing for changes in the unconditional
 ** variance of financial time series"
 **
 */
