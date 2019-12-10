@@ -11,6 +11,10 @@ The [**GAUSS**](www.aptech.com) carrion library is a collection of [**GAUSS**](w
 The program files require a working copy of [**GAUSS 18+**](www.aptech.com). Many can be run on earlier versions with some small revisions.
 
 ### Installing
+**GAUSS 20+**
+The GAUSS Carrion library can be installed and updated directly in GAUSS using the [GAUSS package manager](https://www.aptech.com/blog/gauss-package-manager-basics/).
+
+**GAUSS 18+**
 The GAUSS Carrion library can be easily installed using the [**GAUSS Application Installer**](https://www.aptech.com/support/installation/using-the-applications-installer-wizard/), as shown below:
 
 1. Download the zipped folder `carrionlib.zip` from the [Carrion Library Release page](https://github.com/aptech/gauss-carrion-library/releases).
