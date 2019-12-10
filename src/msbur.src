@@ -82,7 +82,7 @@
 **                  msburCtl.cbar           Scalar,  the value of the c_bar parameter 
 **                                          that is used in the quasi GLS-detrending.
 **
-**  Based on code by Josep Lluís Carrion-i-Silvestre,  based on the code provided by Serena Ng and Pierre Perron (Econometrica,  2001).
+**  Based on code by Josep LluÃ­s Carrion-i-Silvestre,  based on the code provided by Serena Ng and Pierre Perron (Econometrica,  2001).
 **  Last modification: July 1st,  2006,  23:47 pm
 */    
 
@@ -189,7 +189,7 @@ endp;
 **      cbar    scalar,  the value of the c_bar parameter that is used in the quasi GLS-detrending.
 **
 **
-**  Josep Lluís Carrion-i-Silvestre,  based on the code provided by Serena Ng and Pierre Perron (Econometrica,  2001).
+**  Josep LluÃ­s Carrion-i-Silvestre,  based on the code provided by Serena Ng and Pierre Perron (Econometrica,  2001).
 **  Last modification: July 1st,  2006,  23:47 pm
 */    
 proc (9) = __sbur_multiple_gls(y,  model,  penalty,  kmax,  kmin,  estimation);
@@ -275,7 +275,7 @@ endp;
 **      cbar    scalar,  the value of the c_bar parameter that is used in the quasi GLS-detrending.
 **
 **
-**  Josep Lluís Carrion-i-Silvestre,  based on the code provided by Serena Ng and Pierre Perron (Econometrica,  2001).
+**  Josep LluÃ­s Carrion-i-Silvestre,  based on the code provided by Serena Ng and Pierre Perron (Econometrica,  2001).
 **  Last modification: May 26th,  2006,  20:52 pm
 */    
 
@@ -1070,7 +1070,7 @@ endp;
 **      cbar    scalar,  the value of the c_bar parameter that is used in the quasi GLS-detrending.
 **
 **
-**  Josep Lluís Carrion-i-Silvestre,  based on the code provided by Serena Ng and Pierre Perron (Econometrica,  2001).
+**  Josep LluÃ­s Carrion-i-Silvestre,  based on the code provided by Serena Ng and Pierre Perron (Econometrica,  2001).
 **  Last modification: May 26th,  2006,  20:52 pm
 */    
 

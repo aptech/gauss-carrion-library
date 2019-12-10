@@ -964,7 +964,7 @@ endp;
 **      beta    (kx1)-vector of estimated parameters
 **		t_beta	vector of individual significance statistics
 **
-**  (c) 2003 Josep Lluís Carrion-i-Silvestre
+**  (c) 2003 Josep LluÃ­s Carrion-i-Silvestre
 **
 **  Last modification: February 27th,  2003
 */

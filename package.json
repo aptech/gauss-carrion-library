@@ -1,0 +1,25 @@
+{
+    "author": "Josep Carrion-i-Silvestre",
+    "deps": [
+    ],
+    "description": "The GAUSS carrion library is a collection of GAUSS codes developed by Josep Carrion-i-Silvestre. The raw codes provided by Carrion-i-Silvestre have been modified to make use of GAUSS structures.",
+    "dlib": [
+    ],
+    "keywords": [
+    ],
+    "license": "Non-Commercial",
+    "name": "carrionlib",
+    "repo": "",
+    "src": [
+        "brkcoint.src",
+        "carrion.sdf",
+        "coinkpss.src",
+        "coinkpss_factor.src",
+        "factcoint.src",
+        "icss.src",
+        "msbur.src",
+        "rsperron.src",
+        "variance.src"
+    ],
+    "version": "0.1.2"
+}

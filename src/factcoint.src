@@ -51,7 +51,7 @@
 **      i       Scalar,  final number of iterations.
 **
 **
-**      (c) 2013 Josep Lluís Carrion-i-Silvestre
+**      (c) 2013 Josep LluÃ­s Carrion-i-Silvestre
 **              Department of Econometrics
 **              University of Barcelona
 */
@@ -162,7 +162,7 @@ endp;
 **	m_tbe	(Nx1)-vector of estimated break points.
 **
 **
-**      (c) 2006 Josep Lluís Carrion-i-Silvestre
+**      (c) 2006 Josep LluÃ­s Carrion-i-Silvestre
 **              Department of Econometrics
 **              University of Barcelona
 */
@@ -525,7 +525,7 @@ endp;
 **
 **          r_star  Estimated number of stochastic common trends.
 **
-**      (c) 2005 Josep Lluís Carrion-i-Silvestre
+**      (c) 2005 Josep LluÃ­s Carrion-i-Silvestre
 **              Department of Econometrics
 **              University of Barcelona
 */
@@ -895,7 +895,7 @@ endp;
 **
 **          r_star  Estimated number of stochastic common trends.
 **
-**      (c) 2005 Josep Lluís Carrion-i-Silvestre
+**      (c) 2005 Josep LluÃ­s Carrion-i-Silvestre
 **              Department of Econometrics
 **              University of Barcelona
 */
@@ -1158,7 +1158,7 @@ endp;
 **	m_tbe	(Nx1)-vector of estimated break points.
 **
 **
-**      (c) 2006 Josep Lluís Carrion-i-Silvestre
+**      (c) 2006 Josep LluÃ­s Carrion-i-Silvestre
 **              Department of Econometrics
 **              University of Barcelona
 */
