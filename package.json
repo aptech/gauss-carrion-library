@@ -20,6 +20,7 @@
         "msbur.src",
         "rsperron.src",
         "variance.src"
+        "cadf_multiple.src"
     ],
-    "version": "0.1.2"
+    "version": "0.2.2"
 }

@@ -1,0 +1,358 @@
+
+#include carrion.sdf;
+// p : order of the autoregressive correction
+
+proc(2) = CADFcoin_multiple(y,x, struct cadfControl cCtl);
+    
+    local model,num_factors,method,option,p;
+
+	local T, N, k, x_deter, t_cadf, EG_resid, ii, y_temp, x_temp, iii, beta, x_cross_average, y_cross_average, x_reg, EG_resid_crossmean, DEG_resid;
+	local DEG_resid_crossmean, EG_resid_lag, EG_resid_crossmean_lag, resid, s2, var_beta, t_ratio, panel_t_cadf, beta_mgcee;
+	local M_bar, H_bar, beta_ccep_num, beta_ccep_den, beta_ccep, x_temp_det, y_temp_det, lagged_terms;
+	
+    // Extract control struct members
+    model = cCtl.model;
+    num_factors = cCtl.numberFactors;
+    p = cCtl.numlags;
+    option = cCtl.option;
+    method = cCtl.method;
+    
+	T=rows(y);
+	N=cols(y);
+	k=cols(x)/N;
+	
+	if model==1; @ Constant @
+		x_deter=ones(T,1);
+	elseif model==2; @ Linear trend @
+		x_deter=ones(T,1)~seqa(1,1,T);
+	endif;
+
+
+	@ Computing the cross-section averages @
+			
+	x_cross_average=meanc(x[.,1:N]'); @ cross-section average for the first regressor @
+			
+	ii=2;
+	do until ii>k;
+		x_cross_average=x_cross_average~meanc(x[.,(ii-1)*N+1:ii*N]');
+		ii=ii+1;
+	endo;
+			
+	y_cross_average=meanc(Y'); @ cross-section average for the endogenous variable @
+	
+	
+	t_cadf=zeros(N,1);	
+	EG_resid=zeros(T,N); @ Matrix to store the residuals of the Engle-Granger equation @
+						
+			
+	if method == 0; @ no cross averages in the static regression @
+			
+		ii=1;
+		do until ii>N;
+		
+			y_temp=Y[.,ii];
+				
+			x_temp=X[.,ii];
+					
+			iii=2;
+			do until iii>k;
+				x_temp=x_temp~X[.,(iii-1)*N+ii];
+				iii=iii+1;
+			endo;
+
+			if model .ne 0;	
+				x_temp=x_temp~x_deter;		
+			endif;
+				
+			beta=y_temp/x_temp;
+			EG_resid[.,ii]=y_temp-x_temp*beta;
+
+			ii=ii+1;
+		endo;
+			
+			
+	elseif method == 1; @ Holly, Pesaran and Yamagata @
+	
+	
+		if option == 0; @ CCE_individual estimates are used @
+			
+			ii=1;
+			do until ii>N;
+				y_temp=Y[.,ii];
+				x_temp=X[.,ii];
+					
+				iii=2;
+				do until iii>k;
+					x_temp=x_temp~X[.,(iii-1)*N+ii];
+					iii=iii+1;
+				endo;
+				
+				if model .ne 0;
+					x_reg=x_temp~x_deter~y_cross_average~x_cross_average;	
+				elseif model==0;
+					x_reg=x_temp~y_cross_average~x_cross_average;	
+				endif;
+				
+				beta=y_temp/x_reg;
+				
+				if model .ne 0;
+					EG_resid[.,ii]=y_temp-(x_temp~x_deter)*beta[1:cols(x_temp~x_deter)];
+				elseif model == 0;
+					EG_resid[.,ii]=y_temp-x_temp*beta[1:cols(x_temp)];
+				endif;
+
+				ii=ii+1;
+			endo;
+			
+		elseif option == 1; @ MEAN GROUP CCE estimates are used @
+			
+			beta_mgcee=zeros(N,k);
+			
+			ii=1;
+			do until ii>N;
+				y_temp=Y[.,ii];
+				x_temp=X[.,ii];
+					
+				iii=2;
+				do until iii>k;
+					x_temp=x_temp~X[.,(iii-1)*N+ii];
+					iii=iii+1;
+				endo;
+				
+				if model .ne 0;
+					x_reg=x_temp~x_deter~y_cross_average~x_cross_average;	
+				elseif model==0;
+					x_reg=x_temp~y_cross_average~x_cross_average;	
+				endif;
+				
+				beta=y_temp/x_reg;
+				
+				beta_mgcee[ii,.]=beta[1:cols(x_temp)]';
+
+				ii=ii+1;
+			endo;
+			
+			beta_mgcee=meanc(beta_mgcee); @ The MGCEE in Holly et al. (2010) @
+			
+			
+			ii=1;
+			do until ii>N;
+				y_temp=Y[.,ii];
+				x_temp=X[.,ii];
+					
+				iii=2;
+				do until iii>k;
+					x_temp=x_temp~X[.,(iii-1)*N+ii];
+					iii=iii+1;
+				endo;
+				
+				if model .ne 0;
+					x_reg=x_temp~x_deter~y_cross_average~x_cross_average;	
+				elseif model==0;
+					x_reg=x_temp~y_cross_average~x_cross_average;	
+				endif;
+				
+				
+				EG_resid[.,ii]=y_temp-x_temp*beta_mgcee;
+
+				if model .ne 0;
+					EG_resid[.,ii]=EG_resid[.,ii]-x_deter*(EG_resid[.,ii]/x_deter); @ Detrend the variable for the specific deterministic component @
+				endif;
+
+				ii=ii+1;
+			endo;	
+			
+		elseif option == 2; @ Pooled CCE estimator @
+		
+			if model == 1 or model == 2;
+				H_bar=x_deter~y_cross_average~x_cross_average;
+				M_bar=eye(T)-H_bar*invpd(H_bar'H_bar)*H_bar'; @ The projection matrix @
+			elseif model == 0;
+				H_bar=y_cross_average~x_cross_average;
+				M_bar=eye(T)-H_bar*invpd(H_bar'H_bar)*H_bar'; @ The projection matrix @
+			endif;
+
+			
+			beta_ccep_num=zeros(k,1);
+			beta_ccep_den=zeros(k,k);
+			
+			
+			ii=1;
+			do until ii>N;
+				y_temp=Y[.,ii];
+				x_temp=X[.,ii];
+					
+				iii=2;
+				do until iii>k;
+					x_temp=x_temp~X[.,(iii-1)*N+ii];
+					iii=iii+1;
+				endo;
+				
+				if model == 0 or model == 1 or model == 2;
+					beta_ccep_den=beta_ccep_den+x_temp'M_bar*x_temp;
+					beta_ccep_num=beta_ccep_num+x_temp'M_bar*y_temp;
+				elseif model == 3 or model == 4 or model == 5;
+					x_temp_det = x_temp-x_deter*(x_temp/x_deter); @ Detrend the stochastic regressors @
+					y_temp_det = y_temp-x_deter*(y_temp/x_deter); @ Detrend the endogenous variable @
+					
+					H_bar=y_cross_average~x_cross_average;
+					M_bar=eye(T)-H_bar*invpd(H_bar'H_bar)*H_bar'; @ The projection matrix @
+					
+					beta_ccep_den=beta_ccep_den+x_temp_det'M_bar*x_temp_det;
+					beta_ccep_num=beta_ccep_num+x_temp_det'M_bar*y_temp_det;
+				endif;
+
+				ii=ii+1;
+			endo;
+			
+			beta_ccep=inv(beta_ccep_den)*beta_ccep_num;
+			
+			
+			ii=1;
+			do until ii>N;
+				y_temp=Y[.,ii];
+				x_temp=X[.,ii];
+					
+				iii=2;
+				do until iii>k;
+					x_temp=x_temp~X[.,(iii-1)*N+ii];
+					iii=iii+1;
+				endo;				
+				
+				EG_resid[.,ii]=y_temp-x_temp*beta_ccep;
+
+				if model .ne 0;
+					EG_resid[.,ii]=EG_resid[.,ii]-x_deter*(EG_resid[.,ii]/x_deter); @ Detrend the variable for the specific deterministic component @
+				endif;
+
+				ii=ii+1;
+			endo;	
+			
+			
+		endif;
+				
+	endif;
+		
+	t_cadf=cadf_multiple(EG_resid,x_cross_average,model,num_factors,p);
+	
+	panel_t_cadf=meanc(t_cadf);
+	
+	retp(panel_t_cadf,t_cadf);
+	
+endp;
+			
+		
+
+proc(1) = cadf_multiple(EG_resid,x_cross_average,model,num_factors,p);
+	
+	local N, T, k, x_deter, t_cadf, EG_resid_crossmean, DEG_resid, DEG_resid_crossmean, EG_resid_lag, EG_resid_crossmean_lag, Dx_cross_average, x_cross_average_lag;	
+	local ii, y_temp, x_temp, lagged_terms, iii, beta, resid, s2, var_beta, t_ratio;
+	
+	N=cols(EG_resid);
+	T=rows(EG_resid);
+	k=cols(x_cross_average);
+	
+	if model==1; @ Constant @
+		x_deter=ones(T,1);
+	elseif model==2; @ Linear trend @
+		x_deter=ones(T,1)~seqa(1,1,T);
+	endif;	
+	
+	
+	if num_factors < 1;
+		
+		errorlog("The number of factors needs to be at least one. Please, revise your choice");
+		stop;
+		
+	elseif num_factors > 1;
+		
+		if num_factors > k+1; @ Rank condition is not satisfied @
+			print "The rank condition is not satisfied with the number of factors specified";
+			print "The number of factors is set at k+1";
+		else;
+			x_cross_average=x_cross_average[.,1:num_factors-1];
+		endif;
+		
+		Dx_cross_average=x_cross_average-lag(x_cross_average);		
+		x_cross_average_lag=lag(x_cross_average);
+		
+	endif;
+
+	t_cadf=zeros(N,1);
+			
+	EG_resid_crossmean=meanc(EG_resid');
+			
+	DEG_resid=EG_resid-lag(EG_resid);
+	DEG_resid_crossmean=meanc(DEG_resid');
+		
+	EG_resid_lag=lag(EG_resid);
+	EG_resid_crossmean_lag=lag(EG_resid_crossmean);
+	
+	
+	@ Compute the CADF regression @
+
+	ii=1;
+	do until ii>N;
+			
+		y_temp=DEG_resid[2:T,ii];
+		
+		if num_factors == 1;
+			
+			if model == 0;
+                x_temp=EG_resid_lag[2:T,ii]~EG_resid_crossmean_lag[2:T]~DEG_resid_crossmean[2:T];
+            else;
+                x_temp=EG_resid_lag[2:T,ii]~EG_resid_crossmean_lag[2:T]~DEG_resid_crossmean[2:T]~x_deter[2:T,.];
+            endif;
+		
+			if p>0;
+		
+				lagged_terms=lag(y_temp)~lag(DEG_resid_crossmean[2:T]);
+				iii=2;
+				do until iii>p;
+					lagged_terms=lagged_terms~lagn(y_temp,iii)~lagn(DEG_resid_crossmean[2:T],iii);
+					iii=iii+1;
+				endo;
+			
+				y_temp=trimr(y_temp,p,0);
+				x_temp=trimr(x_temp~lagged_terms,p,0);
+			
+			endif;
+		
+		elseif num_factors > 1;
+			
+			if model == 0;
+                x_temp=EG_resid_lag[2:T,ii]~EG_resid_crossmean_lag[2:T]~DEG_resid_crossmean[2:T]~x_cross_average_lag[2:T,.]~Dx_cross_average[2:T,.];
+            else;  
+                x_temp=EG_resid_lag[2:T,ii]~EG_resid_crossmean_lag[2:T]~DEG_resid_crossmean[2:T]~x_cross_average_lag[2:T,.]~Dx_cross_average[2:T,.]~x_deter[2:T,.];
+			endif;
+			
+			if p>0;
+		
+				lagged_terms=lag(y_temp)~lag(DEG_resid_crossmean[2:T])~lag(Dx_cross_average[2:T,.]);
+				iii=2;
+				do until iii>p;
+					lagged_terms=lagged_terms~lagn(y_temp,iii)~lagn(DEG_resid_crossmean[2:T],iii)~lagn(Dx_cross_average[2:T,.],iii);
+					iii=iii+1;
+				endo;
+			
+				y_temp=trimr(y_temp,p,0);
+				x_temp=trimr(x_temp~lagged_terms,p,0);
+			
+			endif;
+			
+		endif;
+
+		beta=y_temp/x_temp;
+		resid=y_temp-x_temp*beta;
+		s2=resid'resid/(T-cols(x_temp));
+		var_beta=s2*invpd(x_temp'x_temp);
+		t_ratio=beta./diag(sqrt(var_beta));
+		t_cadf[ii]=t_ratio[1];	
+		
+		ii=ii+1;
+	endo;
+
+	retp(t_cadf);
+
+endp;
+

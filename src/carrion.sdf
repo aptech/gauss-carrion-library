@@ -32,6 +32,14 @@ struct cointControl {
     scalar numberBreaks;
 };
 
+struct cadfControl {
+ scalar model;
+ scalar numberFactors;
+ scalar method;
+ scalar option;
+ scalar numLags;
+};
+
 struct endOut {
     matrix vec_out;
     matrix bic;
