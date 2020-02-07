@@ -1,64 +1,95 @@
 struct msburControl {
     scalar knownBreak;
-    matrix breakDate;
-    matrix numberBreaks;
-    scalar penalty;
-    scalar kmax; 
-    scalar kmin;
-    scalar estimation;
-    scalar maxIters;
+matrix breakDate;
+matrix numberBreaks;
+scalar penalty;
+scalar kmax;
+scalar kmin;
+scalar estimation;
+scalar maxIters;
 };
 
 struct msburOut {
     scalar pt;
-    matrix mpt;
-    matrix adf;
-    matrix za;
-    matrix mza;
-    matrix msb;
-    matrix mzt;
-    matrix min_tb;
-    matrix cbar;
+matrix mpt;
+matrix adf;
+matrix za;
+matrix mza;
+matrix msb;
+matrix mzt;
+matrix min_tb;
+matrix cbar;
 };
 
 struct cointControl {
     matrix f;
-    string method;
-    scalar model;
-    scalar breakPoint;
-    scalar k2;
-    scalar exogenous;
-    scalar lagsdols;
-    scalar numberBreaks;
+string method;
+scalar model;
+scalar breakPoint;
+scalar k2;
+scalar exogenous;
+scalar lagsdols;
+scalar numberBreaks;
 };
 
 struct cadfControl {
- scalar model;
- scalar numberFactors;
- scalar method;
- scalar option;
- scalar numLags;
+    scalar model;
+scalar numberFactors;
+scalar method;
+scalar option;
+scalar numLags;
 };
 
 struct endOut {
     matrix vec_out;
-    matrix bic;
+matrix bic;
 };
 
 struct kpssOut {
     matrix b;
-    matrix tests;
-    matrix resid;
-    matrix t_b;
-    matrix bic;
+matrix tests;
+matrix resid;
+matrix t_b;
+matrix bic;
 };
 
 struct cointOut {
     struct kpssOut kOut;
-    struct endOut eOut;
+struct endOut eOut;
+};
+
+struct breakControl {
+    
+    scalar h;
+scalar eps1;
+scalar robust;
+scalar prewhit;
+scalar hetomega;
+scalar hetq;
+scalar doglobal;
+scalar dotest;
+scalar dospflp1;
+scalar doorder;
+scalar dosequa;
+scalar dorepart;
+scalar estimbic;
+scalar estimlwz;
+scalar estimseq;
+scalar estimrep;
+scalar estimfix;
+scalar fixb;
+scalar x;
+scalar p;
+scalar eps;
+scalar maxi;
+scalar fixb;
+scalar betaini;
+scalar printd;
+scalar hetdat;
+scalar hetvar;
+scalar fixn;
+
 };
 
 
 
-
-  
