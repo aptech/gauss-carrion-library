@@ -1,0 +1,56 @@
+
+new;
+cls;
+
+__output = 0;
+
+m=3;                         @maximum number of structural changes allowed@
+model=4|m|1|1|2;
+
+k=2; @ Number of factors @
+kmax=6|1; @ Number of maximum factors allowed and estimation method (1 for BIC, 0 for fixed) @
+p_ar=0;
+
+datevec=0;
+bigt=100;
+
+/***************************************************************/
+/***************************************************************/
+
+@ THESE ARE THE PARAMETERS THAT REQUIRE THE BAI-PERRON PROCEDURE @
+@ SEE THE ORIGINAL SOURCE IN PROF. PERRON WEBPAGE FOR FURTHER DETAILS @
+
+eps1=.15; @ Amount of trimming @
+
+/* the following are options if p > 0.
+----------------------------------- */
+fixb=0;                     @set to 1 if use fixed initial values for beta@
+betaini=0;                  @if fixb=1, load the initial value of beta.@
+maxi=20;                    @maximum number of iterations for the nonlinear
+                             procedure to obtain global minimizers.@
+printd=0;                   @set to 1 if want the output from the iterations
+                             to be printed.@
+eps=0.0001;                 @criterion for the convergence.@
+/*--------------------------------- */
+
+hetdat=1;
+hetvar=0;
+
+/***************************************************************/
+/***************************************************************/
+
+x=cumsumc(rndn(bigt,20));
+
+{Z_test, test_n, test_chi, Z_test_sim, test_n_sim, test_chi_sim, fhat}= panelbreak(x,model,p_ar,kmax,datevec);
+
+print "Z test: " Z_test;
+print "Pval (normal): " test_n;
+print "Pval (Chi-square): " test_chi;
+print;
+
+print "Simplified tests";
+print "Z test: " Z_test_sim;
+print "Pval (normal): " test_n_sim;
+print "Pval (Chi-square): " test_chi_sim;
+
+#include z:\josepll\00\panicbrk.src;
