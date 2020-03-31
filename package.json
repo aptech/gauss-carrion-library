@@ -19,8 +19,10 @@
         "icss.src",
         "msbur.src",
         "rsperron.src",
-        "variance.src"
-        "cadf_multiple.src"
+        "variance.src",
+        "panicbrk.src",
+        "brcode2_noprint.src",
+        "cadfcoin_multiple.src"
     ],
-    "version": "0.2.2"
+    "version": "0.2.3"
 }

@@ -900,7 +900,7 @@ endp;
 **              University of Barcelona
 */
 
-proc(2)=MQ_test_c(F, model, n);
+proc(2) = MQ_test_c(F, model, n);
     
     local r,  T,  temp,  u_F,  s_F,  v_F,  r_star,  Yc,  p,  Yc_lag,  j,  m_beta,  m_res,  sigma,  bigJ,  phi_c,  u,  s,  v,  v_c,  MQ,  critical_values;
     local D_Yc,  D_Yc_lag,  Yc_filtered,  i,  l,  Det_omega,  m_bic;
