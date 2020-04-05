@@ -1,0 +1,655 @@
+new;
+cls;
+
+library pgraph;
+
+
+load france[123,19]=z:\france.txt;
+load netherlands[123,19]=z:\netherlands.txt;
+load germany[123,19]=z:\germany.txt;
+load italy[123,19]=z:\italy.txt;
+load ireland[123,19]=z:\ireland.txt;
+load greece[123,19]=z:\greece.txt;
+load portugal[120,19]=z:\portugal.txt; @ Looses 3 observations at the end @
+load spain[123,19]=z:\spain.txt;
+load finland[123,19]=z:\finland.txt;
+load austria[120,19]=z:\austria.txt; @ Looses 3 observations at the end @
+
+
+load year_month[123,2]=z:\year_month.txt;
+year=year_month[.,1];
+month=year_month[.,2];
+
+
+
+lpm_france = france[.,1:9];
+lfp_france = france[.,10:18];
+e_france = france[.,19].*ones(rows(lfp_france),cols(lfp_france));
+
+lpm_netherlands = netherlands[.,1:9];
+lfp_netherlands = netherlands[.,10:18];
+e_netherlands = netherlands[.,19].*ones(rows(lfp_netherlands),cols(lfp_france));
+
+lpm_germany = germany[.,1:9];
+lfp_germany = germany[.,10:18];
+e_germany = germany[.,19].*ones(rows(lfp_germany),cols(lfp_germany));
+
+lpm_italy = italy[.,1:9];
+lfp_italy = italy[.,10:18];
+e_italy = italy[.,19].*ones(rows(lfp_italy),cols(lfp_italy));
+
+lpm_ireland = ireland[.,1:9];
+lfp_ireland = ireland[.,10:18];
+e_ireland = ireland[.,19].*ones(rows(lfp_ireland),cols(lfp_ireland));
+
+lpm_greece = greece[.,1:9];
+lfp_greece = greece[.,10:18];
+e_greece = greece[.,19].*ones(rows(lfp_greece),cols(lfp_greece));
+
+lpm_portugal = portugal[.,1:9];
+lfp_portugal = portugal[.,10:18];
+e_portugal = portugal[.,19].*ones(rows(lfp_portugal),cols(lfp_portugal));
+
+lpm_spain = spain[.,1:9];
+lfp_spain = spain[.,10:18];
+e_spain = spain[.,19].*ones(rows(lfp_spain),cols(lfp_spain));
+
+lpm_finland = finland[.,1:9];
+lfp_finland = finland[.,10:18];
+e_finland = finland[.,19].*ones(rows(lfp_finland),cols(lfp_finland));
+
+lpm_austria = austria[.,1:9];
+lfp_austria = austria[.,10:18];
+e_austria = austria[.,19].*ones(rows(lfp_austria),cols(lfp_austria));
+
+
+
+@+++++++++++++++++++++++++++++++++++++++++++++++++++++@
+@ Estimation of the model allowing for common factors @
+@+++++++++++++++++++++++++++++++++++++++++++++++++++++@
+
+model=7|1;
+k=12|1;
+
+method=1; @ Method to correct for the autoregressive squemes. method == 0 for exogenous (fixed), and ==1 for endogenous (t-sig) @
+p_max=12;
+
+klags=0;
+kleads=0;
+estima=1|klags|kleads; @ Method of estimation: estima[1] == 1 for OLS and == 2 for DOLS; estima[2:3] collects the lags and leads for the DOLS @
+
+
+/* Empirical moments of the distribution obtained for T=100 and 100,000 replications */
+if model[1] == 1 or model[1] == 3 or model[1] == 6;
+    mean_t = -0.41632799;
+    var_t = 0.98339487;
+elseif model[1] == 2 or model[1] == 4 or model[1] == 7;
+    mean_t = -1.5377067;
+    var_t = 0.35005403;
+elseif model[1]==5 or model[1] == 8;
+    mean_t = {-1.6803178,
+            -1.8163351,
+            -1.9198423,
+            -1.9805257,
+            -1.998013,
+            -1.9752734,
+            -1.9125286,
+            -1.816865,
+            -1.6755147}; @ Each row for different values of lambda @
+    
+    var_t = {0.40488013,
+            0.41454518,
+            0.40165997,
+            0.36829752,
+            0.35833849,
+            0.36808259,
+            0.39040626,
+            0.4229098,
+            0.39749512}; @ Each row for different values of lambda @
+endif;
+
+
+
+@+++++++++++++++++++++++++++@
+@ for the coikpss procedure @
+@+++++++++++++++++++++++++++@
+
+cri_coikpss=0|0;  @  cri[1]==0 :   weak exogenous regressors (OLS estimation)
+                     cri[1]==1 :   endogenous regressors (DOLS estimation)
+                     cri[2] : scalar with the initial maximum value for the leads and lags @
+
+if model[1] == 4; 
+    model_coikpss=2;  @   =  1  model An,
+                             2  model A,
+                             3  model B,
+                             4  model C,
+                             5  model D,
+                             6  model E. @
+elseif model[1] == 7; 
+    model_coikpss=5;  @   =  1  model An,
+                             2  model A,
+                             3  model B,
+                             4  model C,
+                             5  model D,
+                             6  model E. @
+endif;
+
+
+print "
+@++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++@
+@ Analysis for the longest panel data set (i.e. excluding Portugal, Finland and Austria) @
+@++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++@";
+
+lpm = lpm_france~lpm_netherlands~lpm_germany~lpm_italy~lpm_ireland~lpm_greece~lpm_spain;
+lfp = lfp_france~lfp_netherlands~lfp_germany~lfp_italy~lfp_ireland~lfp_greece~lfp_spain;
+e = e_france~e_netherlands~e_germany~e_italy~e_ireland~e_greece~e_spain;
+
+
+T=rows(e); @ Number of observations @
+N=cols(e); @ Number of individuals @
+
+tolerance=0.001;
+max_iter=20;
+
+@++++++++++++++++++++++++++++++++@
+@ Estimation of the factor model @
+@++++++++++++++++++++++++++++++++@
+
+{mat_e_idio,fhat,csi,m_tbe,final_iter}=factcoint_iter(lpm,lfp~e,model,zeros(n,2),k,tolerance,max_iter); @ Matrix of idiosyncratic disturbance terms @
+
+
+@++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++@
+@ Estimation of the equation unit-by-unit assuming cointegration @
+@++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++@
+
+m_tb_minSSR=zeros(N,2);
+m_bic_minSSR=zeros(N,1);
+
+num_stregs=2;
+
+if model_coikpss==2;
+    mat_beta=zeros(N,4+num_stregs);
+elseif model_coikpss==5;
+    mat_beta=zeros(N,4+3*num_stregs);
+endif;
+
+mat_MSE=zeros(N,1);
+
+i=1;
+do until i>N;
+
+    y=lpm[2:T,i]; @ We lose the first observation because of the factors estimation procedure @
+    x=lfp[2:T,i]~e[2:T,i];
+
+    {vec_out,bic}=coi_end_factor_2bk(y,x,fhat,model_coikpss,1,cri_coikpss); 
+
+    m_tb_minSSR[i,.]=vec_out[2,2:3];
+    m_bic_minSSR[i,.]=bic;
+
+
+    {b,tests,u,t_b,bic} = coi_kpss_factor_2bk(y,x,fhat,model_coikpss|m_tb_minSSR[i,.]',1,cri_coikpss);
+
+    mat_beta[i,.]=b[1:cols(mat_beta)]';
+
+    y_fit=y-u;
+
+    mat_MSE[i]=u'u/(T-1);
+
+    xy(seqa(1,1,t-1),y~y_fit);
+    //wait;
+
+    i=i+1;
+endo;
+
+
+print "Estimated parameters";
+print "The first three parameters for the deterministic component (constant, slope of the trend and changes in level) and the others for the stochastic regressors";
+print mat_beta;
+print "Estimated break points for the first break (year and month)";
+print year[m_tb_minSSR[.,1],1]~month[m_tb_minSSR[.,1],1];
+print "Estimated break points for the second break (year and month)";
+print year[m_tb_minSSR[.,2],1]~month[m_tb_minSSR[.,2],1];
+
+
+#include factcoint_msb.src;
+#include brkcoint.src;
+#include coikpss_factor.src;
+    
+
+
+
+proc(2)=common_break_estima(y,x,model);
+
+    local T, N, k, i, j, mat_SSR_hat, y_i, x_i, z, b, e_hat, p, ssr_global, Tb_est; 
+
+    T=rows(y); @ Sample size @
+    N=cols(y); @ Number of individuals @
+    k=cols(x)/N; @ Number of regressors @
+
+    mat_SSR_hat=zeros(T-2-2+1,N); @ Matrix to store the individual OLS SSR @
+
+    i=1;
+    do until i>N; @ Compute the individual SSR @
+
+        y_i=y[.,i]; @ Endogenous variable @
+        x_i = x[.,i]; @ First exogenous variable @
+
+        if k > 1; @ Select the addtional stochastic regressors if necessary @
+            j = 2;
+            do until j>k;
+                x_i=x_i~x[.,i+(j-1)*N]; @ Additional regressors @
+                j=j+1;
+            endo;
+        endif;
+
+        j=2;
+        do until j>t-2;
+            z=determi(model[1],t,j); @ Deterministic regressors. Model[2] = j because there is a break @
+            {b, e_hat, p} = olsqr2(y_i,x_i~z); @ OLS estimation of the cointegration relationship. We store the e_hat residuals @
+            mat_SSR_hat[j-1,i]=e_hat'e_hat;
+            j=j+1;
+        endo;
+    
+        i=i+1;
+    endo;
+
+    ssr_global=sumc(mat_SSR_hat'); @ We compute the global SSR @
+    Tb_est=minindc(ssr_global)+1; @ Estimated break point @
+
+    retp(ssr_global,Tb_est);
+endp;
+
+
+
+
+/*************************************************************************/
+/* THIS VERSION: 13/03/06                                               **/
+/* COMPUTE tbar(P) (AND tbar*(P)) STATISTICS IN IM, PESARAN, SHIN (2003)**/
+/* "Testing for unit roots in heterogeneous panels", Journal of         **/
+/*  Econometrics 115, 53-74.                                            **/
+/* For the truncated version, see Pesaran (2006),                       **/
+/* " A SIMPLE PANEL UNIT ROOT TEST UNDER CROSS SECTION DEPENDENCE"      **/
+/*  FEBRUARY 2006                                                       **/
+/* NOTE:                                                                **/
+/* Please report any problems you might have, to: ty228@econ.cam.ac.uk  **/
+/*                                                                      **/
+/* {tbarmat,adf_p_mat,adfs_p_mat,res_p_mat}=ips(var_mat,maxp,case);     **/
+/*                                                                      **/
+/* <<INPUTS>>                                                           **/
+/* var_mat (T x N) matrix                                               **/
+/* N            : number of cross section dimension                     **/
+/* T		: number of observations for i's                            **/
+/* maxp (more than or equal to zero) : maximum number of (ADF) lag order**/
+/*                                    eg. maxp=0: ADF==DF               **/
+/* case=1: no intercept nor trend                                       **/
+/* case=2: with intercept                                               **/
+/* case=3: with intercept and trend                                     **/
+/* <<OUTPUTS>>                                                          **/
+/* tbarmat: (maxp+1) x 2 matrix, first column reports                   **/
+/*          tbar(p) and second column reports tbar*(p)                  **/
+/*          for p=0,1,...,maxp in ascending order                       **/
+/*     -tbar(p) statistic is defined as simple average of               **/
+/*       adf(p)_i statistics                                            **/
+/*     -tbar*(p) statistic is defined as simple average of              **/
+/*       adf*(p)_i statistics, which is truncated version of adf(p)_i.  **/
+/*    Notes: For a discussion about the truncation, See Pesaran (2006), **/
+/*      " A Simple Panel Unit Root Test Under Cross Section Dependence" **/
+/*                                                                      **/   
+/* adf_p_mat: a N x (maxp+1) matrix, reports all ADF(p)_i statistics    **/   
+/* adfs_p_mat: a N x (maxp+1) matrix, reports all ADF*(p)_i statistics  **/   
+/* res_p_mat: a (maxp+1) set of						                    **/ 
+/*		T-(maxp+1) x N matrix of residuals of  ADF(p)_i regressions	    **/
+/*              concatenated vertically, from the top p=0,p=1,,,p=maxp  **/    
+/*                                                                      **/   
+/* IPS is sqrt(N)*(TBAR - E(TBAR))/sqrt(Var(TBAR)).                     **/
+/* Appropriate E(TBAR) and Var(TBAR) are found in                       **/
+/* Table 3 of Im,Pesaran,Shin (2003)                                    **/
+/* NOTEs: Default setting is to print the results. It can be            **/
+/*       suppressed by choosing "outpt=0" below (7th-line of the code   **/
+/* Takashi Yamagata, 13 March 2006                                        **/
+/*                                                                      **/
+/*************************************************************************/
+proc(4)=ips(var_mat,maxp,case);
+local outpt,n,t,tlag,var_mat_1,Dvar_mat_temp,Dvar_mat;
+local tt,y,z,x,xx,k1,k2,bvec,sevec,t_vec,t_bar,i,c_p,temp;
+local trncl,truncu,trnc1,adf_p,adf_ps,tbar_p_mat,tbar_p,tbar_ps;
+local adf_p_mat,adfs_p_mat,idvec,lgorder,res_p_mat,res_p;
+
+
+/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
+outpt=0;/* 1: reports ourput, 0:supress the output */
+/*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@*/
+outwidth 256;
+
+t=rows(var_mat);
+n=cols(var_mat);
+tlag=maxp+1;
+
+var_mat_1=lag(var_mat);
+Dvar_mat_temp=var_mat-var_mat_1;
+    var_mat_1=var_mat_1[tlag+1:t,.];
+    Dvar_mat=Dvar_mat_temp[tlag+1:t,.];
+
+tt=t-tlag;
+
+/*************/
+y=vec(Dvar_mat);
+x=vec(var_mat_1);
+
+/****/
+if case==1;k1=-6.12;k2=4.16;
+elseif case==2;Z=ones(n*tt,1);k1=-6.19;k2=2.61;
+elseif case==3;Z=ones(n*tt,1)~(ONES(N,1).*.seqa(1,1,tt));k1=-6.42;k2=1.70;
+else;"please choose the 'case' only from 1,2, or 3";end;
+endif;
+
+/**************** ESTIMATION ****************/
+c_p=0;
+tbar_p_mat={};
+adf_p_mat={};
+adfs_p_mat={};
+res_p_mat={};
+do while c_p<=maxp;
+
+if c_p>0;
+    temp=(Dvar_mat_temp[tlag+1-c_p:t-c_p,.]);
+    x=x~vec(temp);
+endif;
+
+/*************/
+if case==1;xx=x;
+else;xx=x~Z;
+endif;
+
+/*** MGCCE ****/
+{bvec,sevec,t_vec,res_p}=mgsimple(y,xx,n,tt);
+
+trncl=k1*(t_vec[.,1].<k1);truncu=k2*(t_vec[.,1].>k2);
+trnc1=(t_vec[.,1].>k1).*(t_vec[.,1].<k2);
+
+adf_p = t_vec[.,1];
+adf_ps = (t_vec[.,1].*trnc1+trncl+truncu);
+
+tbar_p=meanc(adf_p);
+tbar_ps=meanc(adf_ps);
+
+if outpt==1;
+format /rd 2,0;
+"@@@@@@@@@@@@@@@@@@@ ADF(";;C_P;;") @@@@@@@@@@@@@@@@@@@@";
+format /rd 2,0;
+"tbar STATISTIC FOR IPS(P): CASE";;case;;
+if case==1;", NO INTERCEPT";
+elseif case==2;", WITH INTERCEPT";
+elseif case==3;", WITH INTERCEPT AND TREND";
+endif;
+format /rd 5,0;
+"N=";;n;;", T=";;tt;;", (";;t;;"data points used)";
+format /rd 8,3;
+"   TBAR(P)            :";;tbar_p;
+"   TBAR(P)*(truncated):";;tbar_ps;
+format /rd 1,2;
+"*Truncation is done for ADF_i in such a way that";
+"when ADF_i<k1, ADF_i=k1 and when ADF_i>k2, ADF_i=k2,";
+"where ";;"k1=";;k1;;" and k2=";;k2;;".";
+"IPS is sqrt(N)*(TBAR - E(TBAR))/sqrt(Var(TBAR)).";
+"Appropriate E(TBAR) and Var(TBAR) are found in Table 3 of Im,Pesaran,Shin (2003).";
+"-------------------------------------------------------";
+"";
+endif;
+tbar_p_mat=tbar_p_mat|(tbar_p~tbar_ps);
+adf_p_mat=adf_p_mat~adf_p;
+adfs_p_mat=adfs_p_mat~adf_ps;
+res_p_mat=res_p_mat|res_p;
+
+    c_p=c_p+1;
+endo;
+
+if outpt==1;
+format /rd 8,0;
+idvec=ftocv(seqa(1,1,n),1,0);
+lgorder="id/p"~ftocv(seqa(0,1,maxp+1)',1,0);
+
+format /rd 2,0;
+"";
+"*****************************************************";
+"ADF_i(p) Statistics: Case";;case;;
+if case==1;", NO INTERCEPT";
+elseif case==2;", WITH INTERCEPT";
+elseif case==3;", WITH INTERCEPT AND TREND";
+endif;
+format /rd 8,0;
+$ (lgorder|(idvec~ftocv(adf_p_mat,1,3)));
+"";
+"*****************************************************";
+format /rd 2,0;
+"ADF*_i(p) Statistics (truncated): Case";;case;;
+if case==1;", NO INTERCEPT";
+elseif case==2;", WITH INTERCEPT";
+elseif case==3;", WITH INTERCEPT and TREND";
+endif;
+format /rd 8,0;
+$ (lgorder|(idvec~ftocv(adfs_p_mat,1,3)));
+format /rd 1,2;
+"*Truncation is done for ADF_i in such a way that";
+"when ADF_i<k1, ADF_i=k1 and when ADF_i>k2, ADF_i=k2,";
+"where ";;"k1=";;k1;;" and k2=";;k2;;".";
+endif;
+
+format /rd 16,8;
+retp(tbar_p_mat,adf_p_mat,adfs_p_mat,res_p_mat);
+endp;
+
+/*** OLS regression for each cross section unit ****/
+proc(4)=mgsimple(y,x,n,t);
+local bvec,sevec,tvec,i,y_i,x_i,beta_i,e_i,zig2,se_i,t_i,res_mat;
+bvec=zeros(n,cols(x));
+sevec=zeros(n,cols(x));
+tvec=zeros(n,cols(x));
+res_mat={};
+i=1;
+do while i<=n;
+    y_i=y[1+(i-1)*t:(i)*t,.];
+    x_i=x[1+(i-1)*t:(i)*t,.];
+    beta_i=y_i/x_i;
+    e_i=y_i-x_i*beta_i;
+    zig2=e_i'e_i/(T-cols(x));
+    se_i=sqrt(diag(zig2*invpd(x_i'x_i)));
+    t_i=beta_i./se_i;
+
+    bvec[i,.]=beta_i';
+    sevec[i,.]=se_i';
+    tvec[i,.]=t_i';
+    res_mat=res_mat~e_i;
+
+i=i+1;
+endo;
+
+retp(bvec,sevec,tvec,res_mat);
+endp;
+
+
+
+
+/**********************/
+/* Pesaran's (2004) 
+cross section dependenc 
+test (CD test)
+and Breusch-Pagan (1980)
+LM test,
+
+{cd,lm}=cdlm(y_mat);
+
+Input: y_mat (TxN)
+N: cross section dimension
+T: time series dimension
+
+output:
+cd: Pesaran's (2004) CD test
+lm: Breusch-Pagan (1980) LM test 
+
+Under the null of no CSD,
+cd ~ N(0,1)
+lm ~ chi-squared with N(N-1)/2 dof.
+*/
+
+proc(4)=cdlm(y_mat);
+
+local t,n,r_mat,i,j,y_mat_dm,sum_r_ij,sum_r2_ij;
+local r_i,r_j,r_ij,rsq_ave,r_ave,cd,lm,nlm;
+local vect_corr, lm_z;
+
+/** rank **/
+t=rows(y_mat);
+n=cols(y_mat);
+
+y_mat_dm= y_mat - meanc(y_mat)';
+
+sum_r_ij=0;
+sum_r2_ij=0;
+vect_corr=zeros(1,3);
+
+i=1;
+do while i<=n-1;
+    j=i+1;
+        do while j<=n;
+            r_i=y_mat_dm[.,i];
+            r_j=y_mat_dm[.,j];
+            r_ij = (r_i'r_j)/(sqrt(r_i'r_i)*sqrt(r_j'r_j));
+            vect_corr=vect_corr|(i~j~r_ij);
+        sum_r_ij=sum_r_ij + r_ij;
+        sum_r2_ij=sum_r2_ij + r_ij^2;
+
+        j=j+1;
+        endo;
+i=i+1;
+endo;
+
+cd=sqrt(t)*sum_r_ij/sqrt(n*(n-1)/2);
+lm=(t)*sum_r2_ij;
+lm_z=(lm-n*(n-1)/2)/sqrt(n*(n-1));
+
+vect_corr=vect_corr[2:rows(vect_corr),.];
+retp(cd,lm,lm_z,vect_corr);
+endp;
+
+
+
+
+proc(7)=outlier_restud(y,x,pair);
+	
+	local T, k, res, H, h_i, s2, s2_i, res_studentized, abs_res_studentized, outliers, indic_outlier, x_rob, y_rob, beta_rob_out, DDFITS, w_i;
+	local DCook,pval_Dcook, influentials, indic_influen, beta_rob_influen;
+
+	T=rows(y);
+	k=cols(x);
+	
+	res=y-x*(y/x); @ OLS residuals @
+	
+	H=x*invpd(x'x)*x';
+	h_i=diag(H);
+	
+	s2=res'res/(T-k);
+	
+	s2_i=(res'res-res^2./(1-h_i))/(T-k-1); @ Variance of the disturbance term removin the i-th observation @
+	
+	res_studentized=res./(sqrt(s2_i).*(1-h_i));
+	
+	
+	abs_res_studentized=abs(res_studentized);
+	outliers=seqa(1,1,rows(abs_res_studentized))~pair~abs_res_studentized;
+	
+    @ Estimate the model without the outliers @
+
+    x_rob=selif(x,outliers[.,cols(outliers)] .lt cdftci(0.025,T-k)); @ Compare the values with a t-Student with T-k d.f., at 5% level of sign. @
+    y_rob=selif(y,outliers[.,cols(outliers)] .lt cdftci(0.025,T-k)); @ Compare the values with a t-Student with T-k d.f., at 5% level of sign. @
+
+    beta_rob_out=y_rob/x_rob;
+
+    indic_outlier=selif(outliers, outliers[.,cols(outliers)] .ge cdftci(0.025,T-k)); @ Compare the values with a t-Student with T-k d.f., at 5% level of sign. @
+	
+    
+    @ Influent observations @
+
+	DDFITS=sqrt(h_i./(1-h_i)).*res_studentized; @ DDFITS @
+	DCook=res_studentized^2/k.*(h_i./(1-h_i)); @ Cook's distance @
+
+    pval_Dcook=cdffc(DCook,k,T-k);
+    influentials=seqa(1,1,T)~pair~pval_Dcook;
+    indic_influen=selif(influentials,influentials[.,cols(influentials)] .lt 0.05);
+
+    @ Estimate the model without the influential observations (according to Cook's distance) @
+
+    x_rob=selif(x,influentials[.,cols(influentials)] .ge 0.05); @ Compare the values with a F-Snedecor, at 5% level of sign. @
+    y_rob=selif(y,influentials[.,cols(influentials)] .ge 0.05); @ Compare the values with a F-Snedecor, at 5% level of sign. @
+
+    beta_rob_influen=y_rob/x_rob;
+
+
+	w_i=abs(DDFITS);
+
+	retp(res_studentized,DDFITS,indic_outlier,indic_influen,y/x,beta_rob_out, beta_rob_influen);
+	
+endp;
+
+
+
+proc(5)=csd_tests(y_mat);
+
+    local t,n,i,j,y_mat_dm,sum_r_ij,sum_r2_ij;
+    local r_i,r_j,r_ij,r_ave,r2_ave,FR,FRE,Var_Q,FRE_asymp, Q, df_1, df_2;
+    local vect_corr, chi_1, chi_2, a_T, b_T, temp_dist;
+    
+    t=rows(y_mat);
+    n=cols(y_mat);
+    
+    y_mat_dm = y_mat; @ Matrix to store the rank of the observations @
+
+    i=1;
+    do until i>n;
+        y_mat_dm[.,i]=rankindx(y_mat[.,i],1); @ Compute the rank @
+        i=i+1;
+    endo;
+        
+    sum_r_ij=0;
+    sum_r2_ij=0;
+    
+    i=1;
+    do while i<=n-1;
+        j=i+1;
+        do while j<=n;
+            r_i=y_mat_dm[.,i]-(T+1/2);
+            r_j=y_mat_dm[.,j]-(T+1/2);
+            r_ij = (r_i'r_j)/(r_i'r_i); @ Spearman's rank correlation coefficient @
+            sum_r_ij=sum_r_ij + r_ij;
+            sum_r2_ij=sum_r2_ij + r_ij^2;
+            j=j+1;
+        endo;
+        i=i+1;
+    endo;
+    
+    r_ave=(2/(n*(n-1)))*sum_r_ij; @ Friedman's R_ave statistic @
+    r2_ave=(2/(n*(n-1)))*sum_r2_ij; @ Frees's R2_ave statistic @
+
+    FR=(T-1)*((N-1)*r_ave+1); @ Friedman's statistic, which is distributed as a Chi-squared with (T-1) d.f. @
+
+    FRE=N*(r2_ave-1/(T-1)); @ Frees's statistic @
+    Var_Q=(32/25)*(T+2)^2/((T-1)^3*(T+1)^2)+(4/5)*(5*T+6)^2*(T-3)/(T*(T-1)^2*(T+1)^2);
+
+    FRE_asymp=FRE/sqrt(Var_Q); @ Using the standard normal approximation for large T @
+
+    df_1=T-1;
+    df_2=T*(T-3)/2;
+
+    chi_1 = cdfchii(seqa(0.01,0.01,100),df_1);
+    chi_2 = cdfchii(seqa(0.01,0.01,100),df_2);
+
+    a_T=4*(T+2)/(5*(T-1)^2*(T+1));
+    b_T=2*(5*T+6)/(5*T*(T-1)*(T+1));
+
+    Q=a_T*(chi_1-(T-1))+b_T*(chi_2-T*(T-3)/2);
+    temp_dist=quantile(Q,0.9|0.95|0.975|0.99);
+    temp_dist=1/(T-1)+temp_dist/N; @ Critical values at the 10, 5, 2.5 and 1% level of significance @
+
+    retp(FR,cdfchic(FR,T-1),FRE,temp_dist,FRE_asymp);
+
+endp;
