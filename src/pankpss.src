@@ -1,9 +1,9 @@
 #include carrion.sdf
 
-proc (5) = pankpss(data, struct breakControl bCtl);
+proc (5) = pankpss(data, model, kernel, struct breakControl bCtl);
     local k, bigt, z, q, x, p, numkpss, denkpss, m_lee_est, m_tb, m_tb2, j,
         datevec, nbreak, mbic, mlwz, supfl, dateseq, ftest, wftest, reparv, nbr, test_hom, test_het,
-        test_var, test_mean,  kpsstest, num, den, test_var, tb, temp1, temp2, testd_hom, testd_het;
+        test_var, test_mean,  kpsstest, num, den, tb, temp1, temp2, testd_hom, testd_het;
     
     // Number of countries
     k = cols(data);

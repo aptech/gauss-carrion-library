@@ -790,7 +790,7 @@ proc(4)=iter_comfac_est_bks(x,model,k);
 
     count=count+1;
 
-    {Dx_iter,mean_var,m_estimated_breaks} = Bai_Perron98(x_iter,model,k); @ First estimate the break points @
+    {Dx_iter,mean_var,m_estimated_breaks} = Bai_Perron98(bigt, x_iter,model,k); @ First estimate the break points @
     {temp,e,fhat,csi}=iter_comfac(x,m_estimated_breaks,k); @ Now we compute the factors conditional to the estimated break points @
 
 
@@ -820,7 +820,7 @@ proc(4)=iter_comfac_est_bks(x,model,k);
         x_iter = x; @ We do not have common factors @
     endif;
 
-    {Dx_iter,mean_var,m_estimated_breaks} = Bai_Perron98(x_iter,model,k);
+    {Dx_iter,mean_var,m_estimated_breaks} = Bai_Perron98(bigt, x_iter, model, k);
 
     retp(e,fhat,csi,m_estimated_breaks);
 
@@ -968,7 +968,7 @@ proc(1) = breakControlCreate(bigt);
     retp(bCtl);
 endp;
 
-proc(3) = Bai_Perron98(x, model, k);
+proc(3) = Bai_Perron98(bigt, x, model, k);
     
     local t, n, Dx, z, q, h, m, mtb, i, m_estimated_breaks, du, dtb, j, mean_var;
     local eps1, fixb, betaini, maxi, printd, eps, robust, prewhit, hetdat, hetvar, hetomega, hetq, doglobal, 
@@ -980,7 +980,7 @@ proc(3) = Bai_Perron98(x, model, k);
 
     // Declare structure
     struct breakControl bCtl;
-    bCtl = breakControlCreate();
+    bCtl = breakControlCreate(bigt);
    
     Dx=x[2:t,.]-x[1:t-1,.];
     
@@ -1057,7 +1057,7 @@ endp;
 **  {Dx,mean_var,m_estimated_breaks} = Bai_Perron98_fixed_m(x,model,k);
 */
 
-proc(3) = Bai_Perron98_fixed_m(x,model,k);
+proc(3) = Bai_Perron98_fixed_m(x, model, k);
     
     local t, n, Dx, z, q, h, m, mtb, i, dd_global, datevec, bigvec, m_estimated_breaks, du, dtb, j, mean_var;
 
@@ -1111,7 +1111,7 @@ endp;
 **  {Dx,mean_var,m_estimated_breaks} = Bai_Perron98_common(x,model,k);
 */
 
-proc(3) = Bai_Perron98_common(x,model,k);
+proc(3) = Bai_Perron98_common(bigt, x, model, k);
     
     local t, n, Dx, z, q, h, m, mtb, i, dd_global, datevec, bigvec, m_estimated_breaks, du, dtb, j, mean_var;
     local dd_datevec,dd_bigvec, ssrmin, datx, j1, optssr, optdat, ib, jlast, dvec, xx, global, jb;
