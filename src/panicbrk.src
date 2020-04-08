@@ -871,7 +871,7 @@ endp;
 **
 **  {Dx,mean_var,m_estimated_breaks} = Bai_Perron98(x,model,k);
 */
-proc(1) = breakControlCreate();
+proc(1) = breakControlCreate(bigt);
 
     // Declare structure
     struct breakControl bCtl;
@@ -1002,7 +1002,7 @@ proc(3) = Bai_Perron98(x, model, k);
     i=1;
     do until i>n;    
     
-        { datevec, nbreak, mbic, mlwz, dateseq, ftest, wftest, reparv } = pbreak(t-1, Dx[., i], z, temp_x, temp_q, q, m_max, bCtl);    
+        { datevec, nbreak, mbic, mlwz, supfl, dateseq, ftest, wftest, reparv } = pbreak(t-1, Dx[., i], z, temp_x, temp_q, q, m_max, bCtl);    
 
 
         if model[4] == 1; @ Sequential procedure at 5% level @

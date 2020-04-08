@@ -1,0 +1,373 @@
+/*
+** Procedure to compute the PANKPSS test. The date is assumed to be known
+**
+** Sintax:
+**
+**    {kpsstest,num,den} = pankpss(y,tb,model,kernel);
+**
+** INPUT:
+**
+**    y         (Tx1)-vector of time series for the i-th individual
+**
+**    Tb        (mx1)-vector with the dates of the break (if there is no break, tb=0)
+**
+**    model     Model specification:
+**                   model = 1, constant (Hadri test)
+**                   model = 2, constant + trend (Hadri test)
+**                   model = 3, constant + shift (in the mean)
+**                   model = 4, constant + trend + shift (in the mean and trend)
+**
+**    kernel    (2x1)-vector where 
+**                   kernel[1] = 0 for Sul, Phillips and Choi (2003) with the Bartlett kernel
+**                   kernel[1] = 1 for Sul, Phillips and Choi (2003) with quadratic spectral kernel
+**                   kernel[1] = 2 for Kurozumi (2002) proposal with Bartlett kernel;
+**
+**                   kernel[2] = scalar, denotes the number of maximum lags that is used in the estimation of the AR(p) model.
+**                                  The final number of lags is chosen using the BIC criterion.
+**
+**
+** OUTPUT:
+**
+**    kpsstest  Value for the individual KPSS test
+**
+**	  num		Numerator of the KPSS test
+**
+**    den 		Denominator of the KPSS test
+**
+**               (c) Josep Lluis Carrion-i-Silvestre (2004)
+**                  Department of Econometrics
+**                  University of Barcelona
+**
+**                   Last modification: July 27th, 2004
+**
+*/
+
+format /rd 14,3;
+
+proc(3) = _pankpss(y,tb,model,kernel);
+
+  local t, z, beta, e, St, var, stl2, lm, num, den;
+        
+  t=rows(y);
+  z=dekpss(model,t,tb);
+  beta=y/z;
+  e=y-z*beta;
+
+  St=cumsumc(e);
+
+    if kernel[1] == 0; @ Sul, Phillips and Choi (2003), Bartlett kernel @
+        var=alrvr_spc_bartlett(e,kernel[2]);
+    elseif kernel[1] == 1; @ Sul, Phillips and Choi (2003), Quadratic kernel @
+        var=alrvr_spc_quadratic(e,kernel[2]);
+    elseif kernel[1] == 2; @ Kurozumi (2002) proposal @
+        var=alrvr_kurozumi(e);
+    endif;
+
+  Stl2 = var/**T*(T-cols(z))^(-1)*/; @ Finite sample!!: we correct for the degrees of freedom @
+
+  LM=inv(t^2)*(St'*St)/Stl2;
+
+  num=inv(t^2)*(St'*St);
+  den=Stl2;
+
+  retp(lm,num,den);
+endp;
+
+
+
+/* 
+** Procedure ALRVR to estimate the long-run variance as 
+** in Andrews (1991) and Kurozumi (2002).
+**
+*/
+
+proc(1)=alrvr_kurozumi(e);
+
+	local t, a, k, l, lrv, i, w, res;
+
+	t=rows(e); 
+	a = e[2:t]/e[1:t-1]; @ AR(1) estimate @
+
+	k=0.7; @ Defines the upper bound @
+	l = minc(1.1447*(4*a^2*T/((1+a)^2*(1-a)^2))^(1/3)
+		    |1.1447*(4*k^2*T/((1+k)^2*(1-k)^2))^(1/3));   
+    
+	l=trunc(l); @ Truncate the estimated bandwidth @
+
+    lrv=e'e/t;
+
+	i=1; 
+	do until i>l; @ long-run variance @
+    		w=(1-i/(l+1)); @ Bartlett kernel @
+     		lrv=lrv+2*e[1:t-i]'e[1+i:t]*w/t; 
+		i=i+1; 
+	endo;
+
+	retp(lrv);
+endp;
+
+
+/* 
+** Procedure ALRVR to estimate the long-run variance as 
+** in Sul, Phillips and Choi (2003). Bartlett kernel.
+**
+*/
+
+proc(1)=alrvr_spc_bartlett(e,kmax);
+
+	local t, i, temp, j, rho_temp, res_temp, rho, a, res, BIC, min_BIC, k, l, lrv, w, lrv_recolored;
+
+	t=rows(e); 
+
+    if kmax <= 0;
+        kmax=1;
+    endif;
+
+    min_BIC = 1e25;
+    i=1;
+    do until i > kmax;
+        temp=e;
+        j=1;
+        do until j>i;
+            temp=temp~lagn(e,j);
+            j=j+1;
+        endo;
+        temp=trimr(temp,i,0);
+        rho_temp=temp[.,1]/temp[.,2:cols(temp)]; @ Autoregressive coefficients @
+        res_temp=temp[.,1]-temp[.,2:cols(temp)]*rho_temp; @ OLS residuals @
+
+
+        BIC = ln(res_temp'res_temp/(t-kmax))+(i*ln(t-kmax)/(t-kmax));
+
+@BIC = ln(res_temp'res_temp/(t-kmax))+0.299*i*(ln((t-kmax))^2.1);@ @ LWZ criterion @
+
+@BIC = ln(res_temp'res_temp/(t-kmax))+2*i/(t-kmax);@ @ AIC criterion @
+
+
+        if BIC < min_BIC;
+            min_BIC = BIC;
+            k=i;
+            rho=rho_temp;
+            res=res_temp; @ Prewithening @
+        endif;       
+        i=i+1;
+    endo;
+
+
+print "K_BIC" k;
+
+
+    temp=trimr(res~lag(res),1,0);
+    a=temp[.,1]/temp[.,2]; @ We use an AR(1) approximation as in Andrews and Monahan (1992, pag. 958) @
+
+	l = 1.1447*(4*a^2*T/((1+a)^2*(1-a)^2))^(1/3); @ Obtaining the bandwidth for the spectral window @
+
+	l=trunc(l); @ Truncate the estimated bandwidth @
+
+	lrv=res'res/t; @ Short-run variance @
+
+	i=1; 
+	do until i>l; @ long-run variance @
+    		w=(1-i/(l+1)); @ Bartlett kernel @
+     		lrv=lrv+2*res[1:rows(res)-i]'res[1+i:rows(res)]*w/t; 
+		i=i+1; 
+	endo;
+
+	lrv_recolored=lrv/(1-sumc(rho))^2; @ Recoloring @
+
+    lrv=minc(lrv_recolored|(T*lrv)); @ Sul, Phillips and Choi (2003) boundary rule @
+ 
+	retp(lrv);
+endp;
+
+
+
+
+/* 
+** Procedure ALRVR to estimate the long-run variance as 
+** in Sul, Phillips and Choi (2003). Quadratic Spectral kernel.
+**
+*/
+
+proc(1)=alrvr_spc_quadratic(e,kmax);
+
+	local t, i, temp, j, rho_temp, res_temp, rho, a, res, BIC, min_BIC, k, l, lrv, w, lrv_recolored;
+
+	t=rows(e); 
+
+    if kmax <= 0;
+        kmax=1;
+    endif;
+
+    min_BIC = 1e25;
+    i=1;
+    do until i > kmax;
+        temp=e;
+        j=1;
+        do until j>i;
+            temp=temp~lagn(e,j);
+            j=j+1;
+        endo;
+        temp=trimr(temp,i,0);
+        rho_temp=temp[.,1]/temp[.,2:cols(temp)]; @ Autoregressive coefficients @
+        res_temp=temp[.,1]-temp[.,2:cols(temp)]*rho_temp; @ OLS residuals @
+
+        BIC = ln(res_temp'res_temp/(t-kmax))+(i*ln(t-kmax)/(t-kmax));
+
+@BIC = ln(res_temp'res_temp/(t-kmax))+0.299*i*(ln((t-kmax))^2.1);@ @ LWZ criterion @
+
+@BIC = ln(res_temp'res_temp/(t-kmax))+2*i/(t-kmax);@ @ AIC criterion @
+
+
+        if BIC < min_BIC;
+            min_BIC = BIC;
+            k=i;
+            rho=rho_temp;
+            res=res_temp; @ Prewithening @
+        endif;       
+        i=i+1;
+    endo;
+
+
+print "K_BIC" k;
+
+    temp=trimr(res~lag(res),1,0);
+    a=temp[.,1]/temp[.,2]; @ We use an AR(1) approximation as in Andrews and Monahan (1992, pag. 958) @
+
+	l = 1.3221*(4*a^2*T/((1+a)^2*(1-a)^2))^(1/5); @ Obtaining the bandwidth for the spectral window @
+
+	l=trunc(l); @ Truncate the estimated bandwidth @
+
+	lrv=res'res/t; @ Short-run variance @
+
+	i=1; 
+	do until i>l; @ long-run variance @
+            w=25/(12*pi^2*(i/l)^2)*(sin(6*pi*i/(l*5))/(6*pi*i/(l*5))-cos(6*pi*i/(l*5))); @ Quadratic spectral kernel @
+     		lrv=lrv+2*res[1:rows(res)-i]'res[1+i:rows(res)]*w/t; 
+		i=i+1; 
+	endo;
+
+	lrv_recolored=lrv/(1-sumc(rho))^2; @ Recoloring @
+
+    lrv=minc(lrv_recolored|(T*lrv)); @ Sul, Phillips and Choi (2003) boundary rule @
+ 
+	retp(lrv);
+endp;
+
+
+
+
+/*
+** Procedure to compute the mean and variance.
+**
+** The input and output is self-explanatory, provided
+** the previous comments.
+**
+*/
+
+proc(1)=calcdem(model,m_tb,t);
+    local tb, lam, m, mean_test, var_test, temp, i, j, A, B;
+      
+    if model == 1 or model == 2;
+        tb=0;
+    elseif model == 3 or model == 4;
+        tb=selif(m_tb,m_tb .gt 0);
+    endif;   
+    
+    lam=tb./t;
+    m=rows(tb);
+    
+    if model == 1 or model == 3;
+        A=1/6;
+        B=1/45;
+    elseif model == 2 or model == 4;
+        A=1/15;
+        B=11/6300;
+    endif;    
+        
+    if m == 1;
+        mean_test=A*(lam^2+(1-lam)^2);
+        var_test=B*(lam^4+(1-lam)^4);
+    else;
+        mean_test=zeros(m+1,1);
+        mean_test[1]=A*(lam[1]^2);
+        mean_test[m+1]=A*((1-lam[m])^2);
+        
+        var_test=zeros(m+1,1);
+        var_test[1]=B*(lam[1]^4);
+        var_test[m+1]=B*((1-lam[m])^4);        
+        
+        i=2;
+        do until i>m;
+            mean_test[i]=A*((lam[i]-lam[i-1])^2);
+            var_test[i]=B*((lam[i]-lam[i-1])^4);
+            i=i+1;
+        endo;
+    
+        mean_test=sumc(mean_test);
+        var_test=sumc(var_test);
+    endif;
+        
+    retp(mean_test~var_test);
+endp;
+
+
+
+/* Procedure to compute deterministic terms 
+** 
+** Sintax is as follows:
+**
+**       detho = dekpss(model,t,tb);
+**
+** INPUT:
+**
+**    model     Scalar, determines the deterministic model that
+**              is considered under the null hypothesis. If:
+**                   model = 1, constant (Hadri test)
+**                   model = 2, constant + trend (Hadri test)
+**                   model = 3, constant + shift (in the mean)
+**                   model = 4, constant + trend + shift (in the mean and trend)
+**
+**    t         Number of observations.
+**
+**    tb        (mx1) vector of dates of breaks 
+**
+**
+** OUTPUT:
+**
+**    detho     Matrix of deterministic terms.
+**
+*/
+
+Proc(1) = dekpss(model,t,tb);
+  local m, du, dt, i, z;     
+  if model == 1;
+    z=ones(t,1);
+  elseif model == 2;
+    z=ones(t,1)~seqa(1,1,t);
+  elseif model == 3;
+    m=rows(tb);
+    du=zeros(t,1);
+    i=1;
+    do until i>m;
+      du=du~(zeros(tb[i],1)|ones(t-tb[i],1));
+      i=i+1;
+    endo;
+    z=ones(t,1)~du[.,2:m+1];
+  elseif model == 4;
+    m=rows(tb);
+    du=zeros(t,1);
+    dt=zeros(t,1);
+    i=1;
+    do until i>m;
+      du=du~(zeros(tb[i],1)|ones(t-tb[i],1));
+      dt=dt~(zeros(tb[i],1)|seqa(1,1,t-tb[i]));
+      i=i+1;
+    endo;
+    z=ones(t,1)~seqa(1,1,t)~du[.,2:m+1]~dt[.,2:m+1];    
+  else;
+    errorlog("Try to speciy another model");
+    end;
+  endif;     
+  retp(z);
+endp;    

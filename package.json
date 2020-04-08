@@ -22,7 +22,9 @@
         "variance.src",
         "panicbrk.src",
         "brcode2_noprint.src",
-        "cadfcoin_multiple.src"
+        "cadfcoin_multiple.src",
+        "granada.src",
+        "pankpss.src"
     ],
     "version": "0.2.3"
 }

@@ -1,0 +1,123 @@
+#include carrion.sdf
+
+proc (5) = pankpss(data, struct breakControl bCtl);
+    local k, bigt, z, q, x, p, numkpss, denkpss, m_lee_est, m_tb, m_tb2, j,
+        datevec, nbreak, mbic, mlwz, supfl, dateseq, ftest, wftest, reparv, nbr, test_hom, test_het,
+        test_var, test_mean,  kpsstest, num, den, test_var, tb, temp1, temp2, testd_hom, testd_het;
+    
+    // Number of countries
+    k = cols(data);
+    
+    // Number of time periods
+    bigt = rows(data);
+    
+    if model == 1 or model == 3;
+        // Matrix conformeb by the elements that are allowed to change
+        z = ones(bigt, 1);
+        
+        // Number of regressors
+        q = cols(z);
+        
+        // No x or lags
+        x = 0;
+        p = 0;
+        
+    elseif model == 2 or model == 4;
+        
+        // Matrix conformeb by the elements that are allowed to change
+        // includes time trend
+        z = ones(bigt, 1)~seqa(1, 1, bigt);
+        
+        // Number of regressors
+        q = cols(z);
+        
+        // No x or lags
+        x = 0;
+        p = 0;
+    endif;
+    
+    
+    // Storeage matrices of results
+    numkpss = zeros(k, 1);
+    denkpss = zeros(k, 1);
+    m_lee_est = zeros(k, 4);
+    m_tb = zeros(1, m);
+    m_tb2 = zeros(1, m);
+    
+    j = 1;
+    do until j>k;
+        
+        { datevec, nbreak, mbic, mlwz, supfl, dateseq, ftest, wftest, reparv } = pbreak(bigt, data[.,j], z, x, p, q, m, bCtl);
+        
+        nbr = mlwz;
+        
+        if nbr > 0;
+            tb = selif(datevec[.,nbr], datevec[.,nbr] .gt 0);
+            { kpsstest, num, den } = _pankpss(data[., j], tb, model, kernel);
+        elseif nbr == 0;
+            { kpsstest, num, den } = _pankpss(data[., j], 0, model0, kernel);
+        endif;
+        
+        numkpss[j] = num;
+        denkpss[j] = den;
+        m_lee_est[j, .] = kpsstest~nbr~mbic~mlwz;
+        
+        m_tb = m_tb|datevec;
+        m_tb2 = m_tb2|reparv;
+        
+        j = j + 1;
+    endo;
+    
+    // Assuming homogenous lr variance
+    test_hom = meanc(numkpss)./meanc(denkpss);
+    
+    // Assuming heterogeneous long-run variance
+    test_het = meanc(m_lee_est[., 1]);
+    
+    m_tb = m_tb[2:rows(m_tb), .];
+    
+    
+    test_mean = zeros(k, 1);
+    test_var = zeros(k, 1);
+    
+    j = 1;
+    do until j>k;
+        if  m_lee_est[j, 2] > 0;
+            temp1 = m_tb[(j*m)-m+1:(j*m), .];
+            // Computes the mean and variance
+            temp2 = calcdem(model, temp1[., m_lee_est[j, 2]], bigt);
+            test_mean[j] = temp2[1];
+            test_var[j] = temp2[2];
+            
+        elseif m_lee_est[j, 2] == 0;
+            // Computes the mean and variance
+            temp2 = calcdem(model0, 0, bigt);
+            test_mean[j] = temp2[1];
+            test_var[j] = temp2[2];
+        endif;
+        j = j + 1;
+    endo;
+    
+    test_mean = meanc(test_mean);
+    test_var = meanc(test_var);
+    
+    testd_hom = sqrt(k)*(test_hom-test_mean)./sqrt(test_var);
+    testd_het = sqrt(k)*(test_het-test_mean)./sqrt(test_var);
+    
+    output file = pibpcmad.out reset;
+    outwidth 256;
+    
+    print "************************************";
+    print "Results for the PANKPSS test        ";
+    print "************************************";
+    
+    print "Stationarity test with structural breaks (homogeneous): " testd_hom "with p-val: " cdfnc(testd_hom);
+    print "Stationarity test with structural breaks (heterogeneous): " testd_het "with p-val: " cdfnc(testd_het);
+    
+    print "Nombre de breaks permesos com a maxim" m;
+    print "Matriu de tests individuals" m_lee_est;
+    print "Nombre d'observacions" rows(data);
+    print "Punts de trencament estimats" m_tb;
+    
+    retp(testd_hom, testd_het, kpsstest, num, den);
+endp;

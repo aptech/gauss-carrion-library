@@ -2,7 +2,7 @@
 
 @November 19, 1999 version@
 @Copyrigth, Pierre Perron (1998, 1999).@
-proc(8) = pbreak(bigt, y, z, x, p, q, m, struct breakControl bCtl);
+proc(9) = pbreak(bigt, y, z, x, p, q, m, struct breakControl bCtl);
     
     local datevec, bigvec, global, i, supfl, ndat, maic, mbic, mlwz, ssrzero, nbreak;
     local dateseq, ftest, wftest, cv, repartda, zz, siglev, j, nbr, datese, cvm, reparv, ii;
@@ -189,13 +189,13 @@ proc(8) = pbreak(bigt, y, z, x, p, q, m, struct breakControl bCtl);
     if estimbic == 1;
         
         
-        call estim(y, z, x, p, q, mbic, datevec[., mbic], robust, prewhit, hetomega, hetq, hetdat, hetvar);
+        call estim(bigt, y, z, x, p, q, mbic, datevec[., mbic], robust, prewhit, hetomega, hetq, hetdat, hetvar);
         
     endif;
     
     
     if estimlwz == 1;
-        call estim(y, z, x, p, q, mlwz, datevec[., mlwz], robust, prewhit, hetomega, hetq, hetdat, hetvar);
+        call estim(bigt, y, z, x, p, q, mlwz, datevec[., mlwz], robust, prewhit, hetomega, hetq, hetdat, hetvar);
     endif;
     
     if estimseq == 1;
@@ -204,7 +204,7 @@ proc(8) = pbreak(bigt, y, z, x, p, q, m, struct breakControl bCtl);
         do while j <= 4;
             if ii == 0;
                 if nbreak[j,1] /= 0;
-                    call estim(y, z, x, p, q, nbreak[j,1], dateseq[j,1:nbreak[j,1]]', robust, prewhit,
+                    call estim(bigt, y, z, x, p, q, nbreak[j,1], dateseq[j,1:nbreak[j,1]]', robust, prewhit,
                         hetomega, hetq, hetdat, hetvar);
                 endif;
             endif;
@@ -236,7 +236,7 @@ proc(8) = pbreak(bigt, y, z, x, p, q, m, struct breakControl bCtl);
             if ii == 0;
                 if nbreak[j, 1] == 0;
                 else;
-                    call estim(y, z, x, p, q, nbreak[j, 1], reparv[j,1:nbreak[j, 1]]', robust, prewhit,
+                    call estim(bigt, y, z, x, p, q, nbreak[j, 1], reparv[j,1:nbreak[j, 1]]', robust, prewhit,
                         hetomega, hetq, hetdat, hetvar);
                 endif;
             endif;
@@ -261,10 +261,10 @@ proc(8) = pbreak(bigt, y, z, x, p, q, m, struct breakControl bCtl);
     endif;
     
     if estimfix == 1;
-        call estim(y, z, x, p, q, fixn, datevec[., fixb], robust, prewhit, hetomega, hetq, hetdat, hetvar);
+        call estim(bigt, y, z, x, p, q, fixn, datevec[., fixb], robust, prewhit, hetomega, hetq, hetdat, hetvar);
     endif;
     
-    retp(datevec, nbreak, mbic, mlwz, dateseq, ftest, wftest, reparv);
+    retp(datevec, nbreak, mbic, mlwz, supfl, dateseq, ftest, wftest, reparv);
     
 endp;
 
@@ -458,7 +458,7 @@ endp;
 
 @********************************************************************@
 
-proc(0) = estim(y, z, x, p, q, m, b, robust, prewhit, hetomega, hetq, hetdat, hetvar);
+proc(0) = estim(bigt, y, z, x, p, q, m, b, robust, prewhit, hetomega, hetq, hetdat, hetvar);
     local dum,nt,vdel,zbar,i,d,bound,reg;
     
     /* This procedure estimate by OLS the model given the obtained break
