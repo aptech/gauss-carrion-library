@@ -6,27 +6,27 @@ cls;
 struct breakControl bCtl;
 
 // Number of breaks
-m=3;        
+m = 3;        
 
 // Model
 model = 4|m|1|1|2;
 
 // Set the number of factors
-k=2;
+k = 2;
 
 // Number of maximum factors to allow
 // and estimation method
-kmax=6|1;
+kmax = 6|1;
 
 // AR degress
-p_ar=0;
+p_ar = 0;
 
 // Datevec
 datevec = 0;
 
 // Generate data
-bigt=100;
-x = cumsumc(rndn(bigt,20));
+bigt = 100;
+x = cumsumc(rndn(bigt, 20));
 
 { Z_test, test_n, test_chi, Z_test_sim, test_n_sim, test_chi_sim, fhat } = panelbreak(x, model, p_ar, kmax, datevec);
 

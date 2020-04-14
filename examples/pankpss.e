@@ -24,8 +24,11 @@ getheaders(__FILE_DIR $+ "pankpss_data.dat");
 ** Calculation of the test with 1 change to the mean
 */
 
-// Set kernal
-kernel = 1|5;
+// Set kernel
+kernel = 1;
+
+// Set maxlags
+maxlags = 5;
 
 // Maximum humber of structural changes allowed
 m = 5;
@@ -46,7 +49,7 @@ struct breakControl bCtl;
 
 // Set control structure members
 // to default values
-bCtl = breakControlCreate(bigt);
+bCtl = breakControlCreate(rows(data));
 
 // Set to print the output from the iterations
 bCtl.printd = 1;
@@ -70,4 +73,5 @@ bCtl.estimseq = 0;
 
 /*****************************************************************************/
 /*****************************************************************************/
-{ test_hom, test_het, kpsstest, num, den } = pankpss(data, bCtl);
+{ test_hom, test_het, kpsstest, m_br} = pankpss(data, model, model0, kernel, maxlags, bCtl);
+

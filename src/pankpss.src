@@ -1,6 +1,6 @@
 #include carrion.sdf
 
-proc (5) = pankpss(data, model, kernel, struct breakControl bCtl);
+proc (4) = pankpss(data, model, model0, kernel, maxlags, struct breakControl bCtl);
     local k, bigt, z, q, x, p, numkpss, denkpss, m_lee_est, m_tb, m_tb2, j,
         datevec, nbreak, mbic, mlwz, supfl, dateseq, ftest, wftest, reparv, nbr, test_hom, test_het,
         test_var, test_mean,  kpsstest, num, den, tb, temp1, temp2, testd_hom, testd_het;
@@ -53,9 +53,9 @@ proc (5) = pankpss(data, model, kernel, struct breakControl bCtl);
         
         if nbr > 0;
             tb = selif(datevec[.,nbr], datevec[.,nbr] .gt 0);
-            { kpsstest, num, den } = _pankpss(data[., j], tb, model, kernel);
+            { kpsstest, num, den } = _pankpss(data[., j], tb, model, kernel, maxlags);
         elseif nbr == 0;
-            { kpsstest, num, den } = _pankpss(data[., j], 0, model0, kernel);
+            { kpsstest, num, den } = _pankpss(data[., j], 0, model0, kernel, maxlags);
         endif;
         
         numkpss[j] = num;
@@ -114,10 +114,10 @@ proc (5) = pankpss(data, model, kernel, struct breakControl bCtl);
     print "Stationarity test with structural breaks (homogeneous): " testd_hom "with p-val: " cdfnc(testd_hom);
     print "Stationarity test with structural breaks (heterogeneous): " testd_het "with p-val: " cdfnc(testd_het);
     
-    print "Nombre de breaks permesos com a maxim" m;
-    print "Matriu de tests individuals" m_lee_est;
-    print "Nombre d'observacions" rows(data);
-    print "Punts de trencament estimats" m_tb;
+    print "Maximum number of breaks allowed" m;
+    print "Matrix of individual tests" m_lee_est;
+    print "Number of observations" rows(data);
+    print "Estimated breaking points" m_tb;
     
-    retp(testd_hom, testd_het, kpsstest, num, den);
+    retp(testd_hom, testd_het, m_lee_est, areshape(m_tb, 15|maxlags|maxlags));
 endp;

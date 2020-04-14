@@ -3,7 +3,7 @@
 **
 ** Sintax:
 **
-**    {kpsstest,num,den} = pankpss(y,tb,model,kernel);
+**    { kpsstest, num, den } = pankpss(y, tb, model, kernel, maxlags);
 **
 ** INPUT:
 **
@@ -22,8 +22,8 @@
 **                   kernel[1] = 1 for Sul, Phillips and Choi (2003) with quadratic spectral kernel
 **                   kernel[1] = 2 for Kurozumi (2002) proposal with Bartlett kernel;
 **
-**                   kernel[2] = scalar, denotes the number of maximum lags that is used in the estimation of the AR(p) model.
-**                                  The final number of lags is chosen using the BIC criterion.
+**    maxlags   scalar, denotes the number of maximum lags that is used in the estimation of the AR(p) model.
+**                   The final number of lags is chosen using the BIC criterion.
 **
 **
 ** OUTPUT:
@@ -44,33 +44,33 @@
 
 format /rd 14,3;
 
-proc(3) = _pankpss(y,tb,model,kernel);
+proc(3) = _pankpss(y, tb, model, kernel, maxlags);
 
   local t, z, beta, e, St, var, stl2, lm, num, den;
         
-  t=rows(y);
-  z=dekpss(model,t,tb);
-  beta=y/z;
-  e=y-z*beta;
+  t = rows(y);
+  z = dekpss(model,t,tb);
+  beta = y/z;
+  e = y-z*beta;
 
   St=cumsumc(e);
 
     if kernel[1] == 0; @ Sul, Phillips and Choi (2003), Bartlett kernel @
-        var=alrvr_spc_bartlett(e,kernel[2]);
+        var = alrvr_spc_bartlett(e, maxlags);
     elseif kernel[1] == 1; @ Sul, Phillips and Choi (2003), Quadratic kernel @
-        var=alrvr_spc_quadratic(e,kernel[2]);
+        var = alrvr_spc_quadratic(e, maxlags);
     elseif kernel[1] == 2; @ Kurozumi (2002) proposal @
-        var=alrvr_kurozumi(e);
+        var = alrvr_kurozumi(e);
     endif;
 
   Stl2 = var/**T*(T-cols(z))^(-1)*/; @ Finite sample!!: we correct for the degrees of freedom @
 
-  LM=inv(t^2)*(St'*St)/Stl2;
+  LM = inv(t^2)*(St'*St)/Stl2;
 
-  num=inv(t^2)*(St'*St);
-  den=Stl2;
+  num = inv(t^2)*(St'*St);
+  den = Stl2;
 
-  retp(lm,num,den);
+  retp(lm, num, den);
 endp;
 
 
