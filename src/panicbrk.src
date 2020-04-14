@@ -790,7 +790,7 @@ proc(4)=iter_comfac_est_bks(x,model,k);
 
     count=count+1;
 
-    {Dx_iter,mean_var,m_estimated_breaks} = Bai_Perron98(bigt, x_iter,model,k); @ First estimate the break points @
+    { Dx_iter,mean_var,m_estimated_breaks } = Bai_Perron98(bigt, x_iter, model, k); @ First estimate the break points @
     {temp,e,fhat,csi}=iter_comfac(x,m_estimated_breaks,k); @ Now we compute the factors conditional to the estimated break points @
 
 
