@@ -24,7 +24,8 @@
         "brcode2_noprint.src",
         "cadfcoin_multiple.src",
         "granada.src",
-        "pankpss.src"
+        "pankpss.src",
+        "pankpss_gr.src"
     ],
     "version": "0.2.3"
 }

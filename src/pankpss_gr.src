@@ -1,0 +1,254 @@
+proc (0) = plotPanKPSS(data, breaks_array, kpss_tests, dtstart, freq, ...);
+    local num_panels, n_dynargs, varnames;
+    
+    // Notice that you do not pass ‘...’
+    // into ‘dynargsCount’
+    n_dynargs = dynargsCount();
+    
+    // Get varnames
+    varnames = dynargsGet(1, "");
+    
+    // Get number of panels
+    num_panels = getorders(breaks_array);
+    num_panels = num_panels[1];
+    
+    // Create variables names
+    if varnames $== "";
+        if num_panels < 9;
+            varnames = "Group " $+ ntos(seqa(1, 1, num_panels), 1);
+        elseif num_panels > 9;
+            varnames = "Group " $+ ntos(seqa(1, 1, 9), 1);
+            varnames = varnames $| ("Group " $+ ntos(seqa(10, 1, (num_panels-9)),2));
+        endif;
+    endif;
+    
+    if dtstart==0 or freq==0;
+        print "Must specify dtstart and frequency for time series plot. XY plot will be generated.";
+        for i(1, num_panels, 1);
+            plotOpenWindow();
+            __pankpssXY(data[., i], arraytomat(breaks_array[i, ., .]), kpss_tests[i, .], varnames[i]);
+        endfor;
+    else;
+        for i(1, num_panels, 1);
+            plotOpenWindow();
+            __pankpssTS(data[., i], arraytomat(breaks_array[i, ., .]), kpss_tests[i, .], dtstart, freq, varnames[i]);
+        endfor;
+    endif;
+endp;
+
+proc (0) = __pankpssXY(y, breaks_mat, kpss_test, varnames);
+    local num_models, field, prec, fmat, max_y, min_y, y_line, 
+    opt_breaks, num_rows, grp_title, x;
+    
+    // Count number of model
+    num_models = rows(breaks_mat);
+    
+    // Define plot appearance
+    struct plotControl pc;
+    pc = plotGetDefaults("xy");
+    
+    // Formatting
+    field = 1;
+    prec = 0;
+    fmat = "%*.*lf";
+    
+    // Set up x values
+    x = seqa(1, 1, rows(y));
+    
+    // Set up max height of graph
+    y_line = -9999|9999;
+    
+    // Select breaks data
+    opt_breaks = breaks_mat[., kpss_test[2]];
+    
+    // Set up title
+    grp_title = varnames $+ " Number of breaks: " $+ ntos(kpss_test[2], prec);
+    
+    // Set title
+    plotSetTitle(&pc, grp_title, "Arial", 16);
+    
+    //Set break line format
+    plotSetLineColor(&pc, "red");
+    plotSetLineStyle(&pc, 1);
+    plotSetLineThickness(&pc, 2);
+    
+    //Set up y-range
+    plotSetYRange(&pc, floor(minc(y)), ceil(maxc(y)));
+    
+    //Plot first graph
+    plotXY(pc, x, y);
+    
+    for j(1, kpss_test[2], 1);
+        //Set break line format
+        plotSetLineColor(&pc, "black");
+        plotSetLineStyle(&pc, 2);
+        plotSetLineThickness(&pc, 1);
+        
+        //Add break line
+        plotAddXY(pc, reshape(opt_breaks[j], 2, 1), y_line);
+    endfor;
+    
+endp;
+
+proc (0) = __pankpssTS(y, breaks_mat, kpss_tests, dtstart, freq, varnames);
+    local num_models, field, prec, fmat, max_y, min_y, y_line, num_rows, grp_title,x,
+        font_color, font_name, title_size, label_size, legend_size, opt_breaks;
+    
+    //Count number of model
+    num_models = rows(breaks_mat);
+    
+    //Define plot appearance
+    struct plotControl pc;
+    pc = __getKPSStsmtDefaults("xy");
+    
+    //Set text title
+    grp_title = __kpssTextSet(&pc, kpss_tests[2]);
+    grp_title = varnames $+ " " $+ grp_title;
+    
+    //Set up x values
+    x = seqa(1, 1, rows(y));
+    
+    //Set up max height of graph
+    y_line = -9999|9999;
+    
+    // Select breaks data
+    opt_breaks = breaks_mat[., kpss_tests[2]];
+    
+    //Set up graph text
+    __kpssGraphText(&pc, y, kpss_tests[2], dtstart, grp_title);
+    
+    //Plot first graph
+    plotTS(pc, dtstart, freq, y);
+    
+    for j(1, kpss_tests[2], 1);
+        
+        __kpssBreakText(&pc);
+        
+        //Add break line
+        plotAddXY(pc, reshape(opt_breaks[j], 2, 1), y_line);
+    endfor;
+    
+endp;
+
+proc (1) = __convertDatesSt(datevecdt, frequency);
+    local fmat, tmp_date;
+    
+    if frequency == 4;
+        fmat = "QQ-YYYY";
+    elseif frequency == 12;
+        fmat = "MO-YYYY";
+    elseif frequency == 1;
+        fmat = "YYYY";
+    elseif frequency == 365;
+        fmat = "DD-MO-YYYY";
+    endif;
+    
+    tmp_date = "";
+    for i(1,cols(datevecdt),1);
+        for j(1,rows(datevecdt),1);
+            
+            if datevecdt[j,i]!=0;
+                tmp_date =  tmp_date $| dttostr(datevecdt[j,i], fmat);
+            else;
+                tmp_date = tmp_date $| "";
+            endif;
+        endfor;
+    endfor;
+    
+    tmp_date = trimr(tmp_date, 1, 0);
+    tmp_date = reshape(tmp_date,rows(datevecdt),cols(datevecdt))';
+    
+    retp(tmp_date);
+endp;
+
+proc (1) = __getKPSStsmtDefaults(graph_type);
+    local font_name, font_color, title_size, label_size, legend_size;
+    
+    //Plot control structure
+    struct plotControl myPlot;
+    
+    //Set plot typ
+    myPlot = plotGetDefaults(graph_type);
+    
+    //Turn grid off
+    plotSetGrid(&myPlot, "off");
+    
+    //Standard settings
+    font_name = "Helvetica Neue";
+    font_color = "#3e3e3e";
+    title_size = 18;
+    label_size = 14;
+    legend_size = 12;
+    
+    plotSetAxesPen(&myPlot, 1, font_color);
+    
+    //Change color of axes numbers
+    plotSetTicLabelFont(&myPlot, font_name, legend_size, font_color);
+    
+    //Title settings
+    plotSetTitle(&myPlot, "", font_name, title_size, font_color);
+    
+    //Legend settings
+    plotSetLegendFont(&myPlot, font_name, legend_size, font_color);
+    
+    //X Label Settings
+    plotSetXLabel(&myPlot, "", font_name, label_size, font_color);
+    
+    //X Label Settings
+    plotSetYLabel(&myPlot, "", font_name, label_size, font_color);
+    retp(myPlot);
+endp;
+
+proc (0) = __kpssGraphText(struct plotControl *mp, y, i, dtstart, grp_title);
+    
+    struct plotControl *myPlot;
+    myPlot = mp;
+    
+    //Set title
+    plotSetTitle(myPlot, grp_title);
+    
+    //Line color
+    plotSetLineColor(myPlot, "#fc8d62");
+    
+    //Set break line format
+    plotSetLineStyle(myPlot, 1);
+    plotSetLineThickness(myPlot, 3);
+    
+    //Set up y-range
+    plotSetYRange(myPlot, floor(minc(y)), ceil(maxc(y)));
+    
+    //Place first 'X' tic mark at start and draw every 4 yrs
+    plotSetXTicInterval(myPlot, 20 , dtstart+5);
+endp;
+
+proc (0) = __kpssBreakText(struct plotControl *mp);
+    struct plotControl *myPlot;
+    myPlot = mp;
+    
+    //Set break line format
+    plotSetLineColor(myPlot, "#8da0cb");
+    plotSetLineStyle(myPlot, 2);
+    plotSetLineThickness(myPlot, 1);
+    
+endp;
+
+proc (1) = __kpssTextSet(struct plotControl *myPlot, num_breaks);
+    local grp_title, field, prec, fmat;
+    
+    //Formatting
+    prec = 1;
+    
+    //Set up title
+    grp_title = "Number of breaks: " $+ ntos(num_breaks, prec);
+    
+    retp(grp_title);
+endp;
+
+proc (1) = __carrionGetTicInt(N, numTics);
+    local ints;
+    
+    // Number of yrs
+    ints = trunc(N/5);
+    
+    retp(ints);
+endp;

@@ -14,7 +14,7 @@ library carrionlib;
 data = loadd(__FILE_DIR $+ "pankpss_data.dat");
 
 // Print data headers
-getheaders(__FILE_DIR $+ "pankpss_data.dat");
+varnames = upper(getheaders(__FILE_DIR $+ "pankpss_data.dat"));
 
 // Use for cross-sectional demeaning
 // data=data-meanc(data)';
@@ -74,4 +74,7 @@ bCtl.estimseq = 0;
 /*****************************************************************************/
 /*****************************************************************************/
 { test_hom, test_het, kpsstest, m_br} = pankpss(data, model, model0, kernel, maxlags, bCtl);
+
+plotPanKPSS(data, m_br, kpsstest, 1870, 1, varnames);
+
 
