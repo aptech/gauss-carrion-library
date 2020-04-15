@@ -104,9 +104,6 @@ proc (4) = pankpss(data, model, model0, kernel, maxlags, struct breakControl bCt
     testd_hom = sqrt(k)*(test_hom-test_mean)./sqrt(test_var);
     testd_het = sqrt(k)*(test_het-test_mean)./sqrt(test_var);
     
-    output file = pibpcmad.out reset;
-    outwidth 256;
-    
     print "************************************";
     print "Results for the PANKPSS test        ";
     print "************************************";
