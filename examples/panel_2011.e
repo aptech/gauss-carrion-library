@@ -274,7 +274,6 @@ nr_fact_par;
 print;
 
 // Analysis for the estimated factors using the MSB statistic 
-
 { dd_test_fhat, r1_fhat, mat_l_fhat } = msb_min(fhat, model);
 print "I(1) Common factors: " r1_fhat;
 print "MSB_tau_f:  " dd_test_fhat;
