@@ -1631,3 +1631,19 @@ proc(4)=factcoint_msb(y,x,model,m_Tb,k);
 
     retp(e,cumsumc(fhat),csi,m_tbe);
 endp; 
+
+proc (1) = detrend_fact(Fhat, model, T);
+    local xreg, i;
+    
+    xreg = ones(T-1, 1);
+    if model==2;
+        xreg = xreg~seqa(2, 1, T-1);
+    endif;
+    
+    for i(1, cols(fhat), 1);
+        // Detrend the factor for deterministics
+        fhat[., i] = fhat[., i] - xreg*(fhat[., i]/xreg);
+    endfor;
+    
+    retp(fhat);
+endp;

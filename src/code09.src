@@ -1,0 +1,364 @@
+
+proc(1) = pvalue(test_msb ,k, pval);
+    local p1, p2, t1, t2, b, c, pv, i, mat_pv, j;
+    if test_msb>=maxc(pval[.,k+1]);
+        pv=0.999;
+    elseif test_msb<minc(pval[.,k+1]);
+        pv=0.001;
+    endif;
+    i=1;
+    do while i<=rows(pval)-1;
+        if test_msb>=pval[i,k+1] and test_msb<pval[i+1,k+1];
+            p1=pval[i,1];
+            p2=pval[i+1,1];
+            t1=pval[i,k+1];
+            t2=pval[i+1,k+1];
+            b=(p2-p1)/(t2-t1);
+            c=p1-b*t1;
+            pv=c+b*test_msb;
+        endif;
+        i=i+1;
+    endo;
+    
+    if pv <= 0;
+        pv = 0.001;
+    endif;
+    retp(pv);
+endp;
+
+@------------------------------------------------@
+
+proc(2) = msb(x, maxlags);
+    
+    local t,k,m,dx,omeg,l,msb_test,i;
+    local ve,v;
+    local ev,evec,lr1,lr2,S00,Sk0,MAIC,mat_lr_var;
+    
+    
+    t=rows(x);
+    k=cols(x);
+    
+    
+    M=x'x/T;
+    Dx=x[2:T,.]-x[1:T-1,.];
+    
+    if maxlags==0;
+        omeg=Dx'Dx/T;
+    else;
+        {ev,evec,lr1,lr2,S00,Sk0,MAIC,mat_lr_var} = vecm_T151(x,-1,maxlags,0,0);
+        omeg=mat_lr_var;
+    endif;
+    
+    
+    {ve,l,v}=svd1(T^(-1)*M*invpd(omeg));
+    
+    l=diag(l);
+    
+    l=sortc(l,1); @ Sort in ascending order @
+    
+    msb_test=zeros(k,1);
+    
+    i=1;
+    do until i > k;
+        msb_test[i]=sumc(l[i:k,.]);
+        i=i+1;
+    endo ;
+    
+    retp(l,msb_test);
+    
+endp;
+
+proc (8) = vecm_T151(x, p, kmax, nodet, r);
+    
+    local T, n, dx, MAIC, k, z, q, r0t, rkt, sig,a,c,b,d,e,lr1,lr2, zz ;
+    local s00, sk0, skk, tmp, crit,i,lx, s, alpha ;
+    local x_reg, beta, res, zJ, dxJ, lxJ, lag_order, mat_lr_var;
+    
+    
+    
+    T=rows(x);
+    n=cols(x);
+    dx = x-lag(x);
+    lx = lag(x);
+    
+    
+    MAIC = zeros(kmax+1, n); @ Matrix to store the MAIC's @
+    
+    
+    k=0;
+    do until k>kmax; @ Loop for all possible values of the lag @
+        
+        
+        @ Define the matrix of lags using the maximum order @
+        
+        if k > 0;
+            z=lagn(dx,1);
+            q = 2;
+            do until q > k;
+                z = z~lagn(dx,q);
+                q = q+1 ;
+            endo ;
+        endif;
+        
+        
+        if k > 0;
+            
+            if p == -1; @ No constant term @
+                x_reg=lx[kmax+2:T,.]~z[kmax+2:T,.]; @ Estimate the VECM usign always the same observations for all k's @
+                beta=dx[kmax+2:T,.]/x_reg;
+                res=dx[kmax+2:T,.]-x_reg*beta;
+            endif;
+            
+            if (nodet ne 1) ;
+                zJ     = detrend_carrion(z[kmax+2:T,.],p);
+                dxJ    = detrend_carrion(dx[kmax+2:T,.],p);
+                r0t   = dxJ - zJ*(dxJ/zJ);
+                lxJ    = detrend_carrion(lx[kmax+2:T,.],p);
+                rkt   = lxJ - zJ*(lxJ/zJ);
+            else ;
+                zJ     = z[kmax+2:T,.];
+                dxJ    = dx[kmax+2:T,.];
+                r0t   = dxJ - zJ*(dxJ/zJ);
+                lxJ    = lx[kmax+2:T,.];
+                lxJ    = lxJ~ptrend(p,rows(lx)) ;
+                rkt   = lxJ - zJ*(lxJ/zJ);
+            endif ;
+            
+        elseif k == 0;
+            
+            if p == -1; @ No constant term @
+                x_reg=lx[kmax+2:T,.]; @ Estimate the VECM usign always the same observations for all k's @
+                beta=dx[kmax+2:T,.]/x_reg;
+                res=dx[kmax+2:T,.]-x_reg*beta;
+            endif;
+            
+            if (nodet ne 1) ;
+                dxJ    = detrend_carrion(dx[kmax+2:T,.],p);
+                r0t   = dxJ;
+                lxJ    = detrend_carrion(lx[kmax+2:T,.],p);
+                rkt   = lxJ;
+            else ;
+                dxJ    = dx[kmax+2:T,.];
+                r0t   = dxJ;
+                lxJ    = lx[kmax+2:T,.];
+                rkt   = lxJ;
+            endif ;
+            
+        endif;
+        
+        
+        skk   = rkt'rkt/rows(rkt) ;
+        sk0   = rkt'r0t/rows(rkt) ;
+        s00   = r0t'r0t/rows(r0t) ;
+        sig   = sk0*inv(s00)*(sk0');
+        
+        {a,b,d,c} = eigrg2(inv(skk)*sig);
+        
+        d = d*inv(chol(d'skk*d)) ;
+        
+        if (_eigerr ne 0) ;
+            "WARNING: _eigerr NOT zero! Eigerr = " _eigerr ;
+        endif ;
+        
+        @ Order the eigen values and eigen vectors @
+        
+        zz    = (-a)~(d') ;
+        zz    = sortc(zz,1) ;
+        a     = -zz[.,1] ;
+        d     = zz[.,2:cols(zz)]' ;
+        
+        @ Compute the trace statistics @
+        
+        lr1   =  zeros(rows(a),1);
+        
+        i     =  1 ;
+        do while (i <= rows(a));
+            lr1[i,1] = -rows(rkt)*sumc(trimr(ln(1-a),i-1,0));
+            i = i + 1 ;
+        endo ;
+        
+        @  Max eigen value statistics @
+        
+        lr2   = -rows(rkt)*ln(1-a) ;
+        
+        MAIC[k+1,.]=(ln(det(res'res/(rows(x)-kmax-1)))+2*(k*n^2*(rows(x)-kmax-1)/rows(rkt)*lr1)./(rows(x)-kmax-1))';
+        
+        k=k+1;
+        
+    endo;
+    
+    lag_order=minindc(MAIC[.,r+1])-1; @ Order of the VECM model: number of regressors in first difference @
+    
+    @ Define the matrix of lags using the lag order @
+    
+    if lag_order > 0;
+        z=lagn(dx,1);
+        q = 2;
+        do until q > lag_order;
+            z = z~lagn(dx,q);
+            q = q+1 ;
+        endo ;
+    endif;
+    
+    
+    if lag_order > 0;
+        
+        if p == -1; @ No constant term @
+            x_reg=lx[kmax+2:T,.]~z[kmax+2:T,.]; @ Estimate the VECM usign always the same observations for all k's @
+            beta=dx[kmax+2:T,.]/x_reg;
+            res=dx[kmax+2:T,.]-x_reg*beta;
+            mat_lr_var=eye(n);
+            i=2;
+            do until i>lag_order+1;
+                mat_lr_var=mat_lr_var-beta[(i-1)*n+1:i*n,.];
+                i=i+1;
+            endo;
+            
+            mat_lr_var=inv(mat_lr_var)'(res'res/(rows(x)-lag_order-1))*inv(mat_lr_var);
+            
+        endif;
+        
+    elseif lag_order == 0;
+        
+        if p == -1; @ No constant term @
+            x_reg=lx[kmax+2:T,.]; @ Estimate the VECM usign always the same observations for all k's @
+            beta=dx[kmax+2:T,.]/x_reg;
+            res=dx[kmax+2:T,.]-x_reg*beta;
+            mat_lr_var=res'res/(rows(x)-lag_order-1);
+        endif;
+        
+    endif;
+    
+    retp(-sortc(-a,1),d,lr1,lr2,s00,sk0,MAIC[.,r+1],mat_lr_var);
+    
+endp ;
+@-------------------------------------------------@
+
+
+proc(3) = msb_min(x, model);  @ for maxlags=5 (t=100), maxlags=6 (t=200) and maxlags=8 for t=500 @
+    
+    local t,k,crit_val,l,ve,v,i,m,temp,r,mat_rejections,x_A2,msb_test,mat_l, maxlags;
+    
+    t = rows(x);
+    k = cols(x);
+    
+    if model == 1; @ The constant only specification. 5% critical values @
+        if t==93;
+            crit_val={ 0.06294176, 0.03180539, 0.02266462, 0.01859126, 0.01583955, 0.01410873   };
+        elseif t==199;
+            crit_val={0.06098082, 0.02980558, 0.02026237, 0.01604860, 0.01330518, 0.01157560};
+        elseif t==499;
+            crit_val={0.05932868, 0.02795638, 0.01876280, 0.01473748, 0.01200267, 0.01020069  };
+        else;
+            print "error t";
+        endif;
+        
+    elseif model==2;
+        if t==93;
+            crit_val={ 0.04195114, 0.02677865, 0.02059680, 0.01716498, 0.01497538, 0.01350006 };
+        elseif t==199;
+            crit_val={ 0.03969140, 0.02430889, 0.01775853, 0.01464956, 0.01249713, 0.01086680 };
+        elseif t==499;
+            crit_val={0.03888129, 0.02283894, 0.01658215, 0.01310180, 0.01092683, 0.00946305 };
+        else;
+            print "Error T";
+        endif;
+        
+    else;
+        errorlog("ERROR: Choose either Model 1 or Model 2 for the deterministic specification");
+        stop;
+    endif;
+    
+    
+    M=x'x/T;
+    
+    { ve, l, v }=svd1(M/T);
+    l = diag(l);
+    
+    temp = l~ve';
+    temp = sortc(temp,1);
+    //  Eigenvectors corresponding to the sorted (in ascending order) eigenvalues
+    ve = temp[.,2:cols(temp)]'; 
+    
+    // Initial value for the number of stochastic trends
+    r=k;
+    mat_l=zeros(k,1);
+    mat_rejections=zeros(k,1);
+    
+    i=1;
+    do until i>k;
+        x_A2=x*ve[.,i:k];
+        maxlags = int((40)^(1/3));
+        
+        { l, msb_test } = msb(x_A2, maxlags);
+        mat_l[i,.]=l[1];
+        
+        if i==1;
+            if l[1] < crit_val[k-i+1];
+                mat_rejections[i]=1;
+                r=r-1; @ Number of stochastic trends @
+            endif;
+        else;
+            if mat_rejections[i-1] .ne 0; @ We have rejected in the previous test @
+                if l[1] < crit_val[k-i+1];
+                    mat_rejections[i]=1;
+                    r=r-1; @ Number of stochastic trends @
+                endif;
+            else;
+                goto theend; @ We have not rejected in the previous step and the testing procedure is over @
+            endif;
+        endif;
+        i=i+1;
+        
+    endo;
+    
+    
+    theend:
+        @mat_l;@
+        @mat_l'~l[1]~r;mat_rejections'~r;@
+        retp(l[1], r, mat_l);  
+endp;
+
+proc detrend_carrion(data, p) ;
+    local t, u, m, timep, it, iit, xmat, invx, beta, resid, nobs ;
+    if (p == -1) ;
+        retp(data);
+    endif ;
+    nobs     = rows(data) ;
+    u        = ones(nobs,1) ;
+    if p > 0 ;
+        timep    = zeros(nobs,p) ;
+        t        = seqa(1,1,nobs)/nobs ;
+        m        = 1 ;
+        do while m <= p ;
+            timep[.,m] = t^m ;
+            m = m + 1 ;
+        endo ;
+        xmat     = u~timep ;
+    else ;
+        xmat = u ;
+    endif ;
+    invx     = inv(xmat'xmat) ;
+    beta     = invx*(xmat'data)  ;
+    resid    = data - xmat*beta  ;
+    retp(resid) ;
+endp ;
+
+proc ptrend(p, nobs) ;
+    local data, t, u, m, timep, it, iit, xmat, invx, beta, resid ;
+    u        = ones(nobs,1) ;
+    if p > 0 ;
+        timep    = zeros(nobs,p) ;
+        t        = seqa(1,1,nobs)/nobs ;
+        m        = 1 ;
+        do while m <= p ;
+            timep[.,m] = t^m ;
+            m = m + 1 ;
+        endo ;
+        xmat     = u~timep ;
+    else ;
+        xmat = u ;
+    endif ;
+    retp(xmat) ;
+endp ;
+
