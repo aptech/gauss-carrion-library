@@ -13,6 +13,7 @@
     "src": [
         "brkcoint.src",
         "carrion.sdf",
+        "code09.src",
         "coinkpss.src",
         "coinkpss_factor.src",
         "factcoint.src",
@@ -25,7 +26,8 @@
         "cadfcoin_multiple.src",
         "granada.src",
         "pankpss.src",
-        "pankpss_gr.src"
+        "pankpss_gr.src",
+        "pu_mp.src"
     ],
-    "version": "0.2.3"
+    "version": "1.0.0"
 }
