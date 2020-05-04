@@ -2,7 +2,7 @@
 #include carrion.sdf;
 // p : order of the autoregressive correction
 
-proc(2) = CADFcoin_multiple(y,x, struct cadfControl cCtl);
+proc(2) = CADFcoin_multiple(y, x, struct cadfControl cCtl);
     
     local model,num_factors,method,option,p;
 

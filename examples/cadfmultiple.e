@@ -1,8 +1,6 @@
 new;
 cls;
-
-#include cadfcoin_multiple.src;
-#include carrion.sdf;
+library carrionlib;
 
 //**********************************************************
 // Start reading your data (here we generate artificial data) 

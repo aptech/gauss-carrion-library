@@ -401,8 +401,6 @@ endp;
 **
 */
 
-#include variance.src;
-
 proc (2)= kappa2(e, cri);
     
     local t, k, dk, ct, tb, kap2, e2, s2, c;
