@@ -1,7 +1,7 @@
 new;
 cls;
 
-data_test = loadd("gdp.dat");   @ gdp  @
+data_test = loadd(__FILE_DIR $+ "gdp.dat");   @ gdp  @
 
 // Number of common factors
 m = 1; 

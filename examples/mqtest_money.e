@@ -3,7 +3,7 @@ cls;
 library carrionlib;
 
 // Money
-data_test = loadd("money.dat");   
+data_test = loadd(__FILE_DIR $+ "money.dat");   
 
 // Set up data
 y = data_test;

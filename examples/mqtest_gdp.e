@@ -4,7 +4,7 @@ library carrionlib;
 
 
 // Load GDP data
-data_test = loadd("gdp.dat"); 
+data_test = loadd(__FILE_DIR $+ "gdp.dat"); 
 
 // Set up data
 y = data_test;

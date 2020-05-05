@@ -2,11 +2,11 @@ new;
 cls;
 
 library pgraph, carrionlib;
-m1_T100 = loadd("m1.dat");
-m2_T200 = loadd("m2.dat");
-w = loadd("gdp.dat");
-y = loadd("money.dat");
-z = loadd("exch.dat");
+m1_T100 = loadd(__FILE_DIR $+ "m1.dat");
+m2_T200 = loadd(__FILE_DIR $+ "m2.dat");
+w = loadd(__FILE_DIR $+ "gdp.dat");
+y = loadd(__FILE_DIR $+ "money.dat");
+z = loadd(__FILE_DIR $+ "exch.dat");
 
 
 maxlags = int((40)^(1/3));

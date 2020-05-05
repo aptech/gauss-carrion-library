@@ -1,7 +1,7 @@
 new;
 cls;
 
-data_test = loadd("money.dat");   
+data_test = loadd(__FILE_DIR $+ "money.dat");   
 
 // Number of common factors
 m = 6; 
