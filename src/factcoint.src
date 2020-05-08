@@ -4,6 +4,104 @@
 **
 ** Sintaxis:
 **
+**      {e,F} = factcoint_orig(y,model,k);
+**
+** Input:
+**
+**      y       (TxN)-matrix of variables
+**
+**      model   Scalar, denotes the deterministic model
+**
+**              model = 1 for the individual effects model,
+**              model = 2 for the individual and time effects model,
+**
+**      k       (2x1)-vector for the common factors
+**
+**              k[1] scalar, with the maximum number of common factors
+**
+**              k[2] = 0 if the number of common factors is known
+**                   = 1 if the number of common factors is unknown
+**
+** Output:
+**
+**      e       (T-1xN)-matrix of idiosyncratic disturbance terms.
+**
+**      Fhat    (T-1 x r)-matrix of common factors.
+**
+**
+**      (c) 2005 Josep Lluís Carrion-i-Silvestre
+**              Department of Econometrics
+**              University of Barcelona
+*/
+
+proc(2) = factcoint_orig(y, model, kk);
+
+  local t, n, D_res, i, beta, u, s, v, csi, fhat, De, e, CT, sigma, IC1;
+
+  T=rows(y); @ Sample size @
+  N=cols(y); @ Number of individuals @
+
+  if model == 1;
+      D_res=y[2:t,.]-y[1:t-1,.];
+  elseif model == 2;
+      D_res=(y[2:t,.]-y[1:t-1,.])-meanc(y[2:t,.]-y[1:t-1,.])';
+  endif;
+
+  D_res = D_res./stdc(D_res)';
+
+  start:
+  if kk[1]==0;
+      e=cumsumc(D_res);
+      Fhat=0; @ There are no common factors @
+      goto theend;
+  endif;
+
+  {u,s,v}=svd1(D_res'*D_res);
+
+  if kk[2] == 0; @ Manual selection of the number of factors @
+      csi=sqrt(n)*u[.,1:kk[1]];
+          fhat=inv(n)*D_res*csi;
+      De = D_res - fhat*csi';
+          e=cumsumc(De);
+  elseif kk[2] == 1; @ Estimation of the number of factors as in Bai and Ng (2002, Econometrica) @
+          CT=zeros(kk[1],1);
+          sigma=zeros(kk[1],1);
+          IC1=zeros(kk[1],1);
+          i=1;
+          do until i>kk[1];
+                  CT[i] = ln(N*T/(N+T))*i*(N+T)/(N*T); @ Panel BIC @
+          csi=sqrt(n)*u[.,1:i];
+          fhat=inv(n)*D_res*csi;
+          De = D_res - fhat*csi';
+                  sigma[i] = meanc(sumc(De.*De/T));
+                  IC1[i] = ln(sigma[i]) + CT[i];
+                  i=i+1;
+          endo;
+
+          IC1 = ln(meanc(sumc(D_res.*D_res/T)))|IC1; @ We compute the IC1 for k=0 @
+
+          kk[1]=minindc(IC1)-1; @ The estimated number of factors @
+
+          if kk[1] == 0;
+                  goto start; @ We don't have common factors @
+          endif;
+
+      csi=sqrt(n)*u[.,1:kk[1]];
+          fhat=inv(n)*D_res*csi;
+      De = D_res - fhat*csi';
+          e=cumsumc(De);
+  endif;
+
+  theend:
+
+  retp(e, cumsumc(fhat));
+endp;
+
+/*
+** Procedure to compute the common factors
+**
+** Sintaxis:
+**
 **      {e,  Fhat,  csi,  m_tbe} = factcoint_iter(y, x, model, m_Tb, k);
 **
 ** Input:
