@@ -155,7 +155,11 @@ proc (4)  =   coi_kpss(y, x, model, k2, cri);
         errorlog("ERROR: Try to specify the deterministic component again");
         stop;
     endif;
-    
+        
+    if model[2] > t;
+       errorlog("Specified breakpoint exceeds the number of observations");
+       end;
+    endif;
     /****************************************/
     /****************************************/
     
