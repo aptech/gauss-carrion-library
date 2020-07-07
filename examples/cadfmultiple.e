@@ -6,24 +6,24 @@ library carrionlib;
 // Start reading your data (here we generate artificial data) 
 //**********************************************************
 
-t = 100;
-n = 20;
+// Here we load all data for testing
+// Note that this dataset is stacked
+// and the cadfcoin_multiple procedure
+// requires wide panel data
+data = loadd(__FILE_DIR $+ "brics.xlsx", "lco2 + ly"); 
 
-// Dependemt variable
-y = cumsumc(rndn(t, n)); 
+// Time periods
+bigt = 29;
+ncross = rows(data)/bigT;
+k = 1;
 
-// First regressor
-x1 = cumsumc(rndn(t, n)); 
+// Convert dependent data
+// from stacked to wide
+y = reshape(data[., 1], ncross, bigT)';
 
-// Second regressor
-x2 = cumsumc(rndn(t, n)); 
-
-// Third regressors
-x3 = cumsumc(rndn(t, n)); 
-
-// Concatenation of the stochastic regressors 
-// (in this example, we just consider three stochastic regressors) @
-x = x1~x2~x3; 
+// Convert independent data
+// from stacked to wide
+x = reshape(data[., 2]', ncross*k, bigT)';
 
 //***************************************
 // Start defining the options of the code 
@@ -32,18 +32,18 @@ struct cadfControl cadfCtl;
 
 // Model = 0 for the non-deterministics specification, 
 // 1 for the constant and 2 for the trend 
-cadfCtl.model = 2; 
+cadfCtl.model = 1; 
 
 // Number of common factors
 cadfCtl.numberFactors = cols(x)+1; 
 
 // Method = 1 if you include CS averages in the cointegration regression as in Holly et al. (2010). 
 // Method = 0 if you do not want to include them 
-cadfCtl.method = 1; 
+cadfCtl.method = 0; 
 
 // Set 1 for the mean group estimator, 2 for the pooled estimator, 
 // which is the estimator proposed in the paper 
-cadfCtl.option = 2; 
+cadfCtl.option = 1; 
 
 // Order of the autoregressive correction
 cadfCtl.numlags= 3;

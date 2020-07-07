@@ -1,6 +1,16 @@
 new;
 cls;
+library carrionlib;
 
+// Load data
+test_data = loadd(__FILE_DIR $+ "brics.xlsx", "lco2");
+
+// Time periods
+bigt = 29;
+ncross = rows(test_data)/bigT;
+
+// Create wide panel data
+lco2_wide = reshape(test_data, ncross, bigT)';
 
 // Declare control structurea
 struct breakControl bCtl;
@@ -16,7 +26,7 @@ k = 2;
 
 // Number of maximum factors to allow
 // and estimation method
-kmax = 6|1;
+kmax = 3|1;
 
 // AR degress
 p_ar = 0;
@@ -24,11 +34,7 @@ p_ar = 0;
 // Datevec
 datevec = 0;
 
-// Generate data
-bigt = 100;
-x = cumsumc(rndn(bigt, 20));
-
-{ Z_test, test_n, test_chi, Z_test_sim, test_n_sim, test_chi_sim, fhat } = panelbreak(x, model, p_ar, kmax, datevec);
+{ Z_test, test_n, test_chi, Z_test_sim, test_n_sim, test_chi_sim, fhat } = panelbreak(lco2_wide, model, p_ar, kmax, datevec);
 
 print "Z test: " Z_test;
 print "Pval (normal): " test_n;

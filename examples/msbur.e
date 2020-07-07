@@ -4,41 +4,17 @@ cls;
 library carrionlib;
 
 /*
-** This section 
-** generates data for testing
+** This section loads data
+** note this test is a time series test
+** we will test each individual in the panel
+** separately
 */
-
-// Number of observations
-T = 200;
-
-// Location of break
-lambda1 = 0.5;
-
-// Find break point
-tb1 = int(lambda1*t);
-
-//  Break in mean
-du1 = zeros(tb1, 1)|ones(t-tb1, 1);
-
-//  Break in trend
-dt1 = zeros(tb1, 1)|seqa(1, 1, t-tb1);
-
-// Generate error term
-v = rndn(t, 1);    
-
-// Storage matrix
-u = zeros(t, 1);
-
-// Persistence
-alpha = 1;
-
-j = 2;
-do until j>T;
-    u[j] = alpha*u[j-1] + v[j];
-    j = j + 1;
-endo;
-
-y = DT1 + u; @ DGP @
+// Here we load all data for testing
+// Note that this dataset is stacked
+// and the cadfcoin_multiple procedure
+// requires wide panel data
+y = loadd(__FILE_DIR $+ "gdp.dat", "GDP_1");
+t = rows(y);
 
 /*
 ** This section sets parameters 
