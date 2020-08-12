@@ -12,9 +12,6 @@ ncross = rows(test_data)/bigT;
 // Create wide panel data
 lco2_wide = reshape(test_data, ncross, bigT)';
 
-// Declare control structurea
-struct breakControl bCtl;
-
 // Number of breaks
 m = 3;        
 
