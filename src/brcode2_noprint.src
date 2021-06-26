@@ -37,6 +37,12 @@ proc(9) = pbreak(bigt, y, z, x, p, q, m, struct breakControl bCtl);
         
     siglev = { 10, 5, 2.5, 1 };
     
+    // Check size of minimum segment versus bigt
+    if bigt<h;
+        errorlog "Minimum break segment is too large. Must be smaller than number of observations. Default segment size used.";
+        h = 0.15*bigt;
+    endif;
+    
     if doglobal == 1;
         /* The following calls the procedure to obtain the break dates and the
         associated sum of squared residuals for all numbers of breaks between
@@ -58,7 +64,7 @@ proc(9) = pbreak(bigt, y, z, x, p, q, m, struct breakControl bCtl);
         
         i = 1;
         do while i <= m;
-//            ftest[i, 1] = pftest(bigt, y, z, x, p, q, i, datevec, prewhit, robust, hetdat, hetvar);
+
             ftest[i, 1] = pftest(bigt, y, z, x, p, q, i, datevec, prewhit, robust, hetdat, hetvar);
             
             i = i + 1;
@@ -267,122 +273,6 @@ proc(9) = pbreak(bigt, y, z, x, p, q, m, struct breakControl bCtl);
     retp(datevec, nbreak, mbic, mlwz, supfl, dateseq, ftest, wftest, reparv);
     
 endp;
-
-@*******************************************************************@
-
-proc(3) = dating(y, z, h, m, q, bigt);
-    
-    @This is the main procedure which calculates the break points that
-    globally minimizes the SSR. It returns optimal dates and associated SSR
-    for all numbers of breaks less than or equal to m.@
-    
-    local datevec, optdat, optssr, dvec, i, ssrmin, datx, j1, ib, jlast;
-    local global, vecssr, jb, xx, bigvec;
-    
-    datevec = zeros(m, m);
-    optdat = zeros(bigt, m);
-    optssr = zeros(bigt, m);
-    dvec = zeros(bigt, 1);
-    global = zeros(m, 1);
-    
-    bigvec = zeros(bigt*(bigt+1)/2, 1);
-    @
-    segment to construct the vector of SSR of dimension T*(T+1)/2
-    @
-    i=1;
-    do while i <= bigt-h+1;
-        vecssr = ssr(i, y, z, h, bigt);
-        bigvec[(i-1)*bigt+i-(i-1)*i/2:i*bigt-(i-1)*i/2, 1] = vecssr[i:bigt, 1];
-        i = i + 1;
-    endo;
-    
-    @
-    Section that applies the dynamic programming algorithm to look for the
-    optimal breaks
-    The first case is when m = 1. Here the dynamic programming algorithm is not
-    needed and one call to the parti(.) procedure is enough.
-    @
-    if m == 1;
-        {ssrmin, datx} = parti(1, h, bigt-h, bigt, bigvec, bigt);
-        datevec[1, 1] = datx;
-        global[1, 1] = ssrmin;
-    else;
-        
-        @ when m > 1, a dynamic programming algorithm is used.
-        The first step is to obtain the optimal one break partitions for all
-        possible ending dates from 2h to T-mh+1.
-        The optimal dates are stored in a vector optdat.
-        The associated ssr are stored in a vector optssr.
-        @
-        j1 = 2*h;                                   @First loop. Looking for the@
-        do while j1 <= bigt;                      @optimal one break partitions@
-            { ssrmin, datx } = parti(1, h, j1-h, j1, bigvec, bigt);@for break dates between h and@
-            optssr[j1, 1] = ssrmin;                      @T-h. j1 is the last date of the@
-            optdat[j1, 1] = datx;                        @segments.@
-            j1 = j1 + 1;
-        endo;
-        global[1, 1] = optssr[bigt, 1];
-        datevec[1, 1] = optdat[bigt, 1];
-        @
-        When this is done the algorithm looks for optimal 2,3,... breaks
-        partitions. The index used is ib.
-        @
-        ib = 2;
-        do while ib <= m;
-            if ib == m;                 @If we have reached the highest number of breaks
-                considered, only one segment is considered, that
-                which ends at the last date of the sample.@
-                jlast = bigt;
-                jb = ib*h;                       /* date of the break */
-                do while jb <=jlast-h;
-                    dvec[jb, 1] = optssr[jb, ib-1]+bigvec[(jb+1)*bigt-jb*(jb+1)/2, 1];
-                    jb = jb + 1;
-                endo;
-                optssr[jlast, ib] = minc(dvec[ib*h:jlast-h, 1]);
-                optdat[jlast, ib] = (ib*h-1)+minindc(dvec[ib*h:jlast-h, 1]);
-                
-            else;
-                @If we have not reached the highest number of breaks
-                considered, we need to loop over the last date of
-                the segment, between (ib+1)*h and T.@
-                jlast = (ib+1)*h;
-                
-                do while jlast <= bigt;
-                    
-                    jb = ib*h;                       /* date of the break */
-                    
-                    do while jb <=jlast-h;
-                        dvec[jb, 1] = optssr[jb, ib-1]+bigvec[jb*bigt-jb*(jb-1)/2+jlast-jb, 1];
-                        jb = jb + 1;
-                    endo;
-                    optssr[jlast, ib] = minc(dvec[ib*h:jlast-h, 1]);
-                    optdat[jlast, ib] = (ib*h-1)+minindc(dvec[ib*h:jlast-h, 1]);
-                    jlast = jlast + 1;
-                endo;
-            endif;
-            
-            @At each time we loop the results with ib breaks are retrieved
-            and printed@
-            
-            datevec[ib, ib] = optdat[bigt, ib];
-            
-            i = 1;
-            do while i <= ib-1;
-                xx = ib-i;
-                datevec[xx, ib] = optdat[datevec[xx+1, ib], xx];
-                i = i + 1;
-            endo;
-            global[ib, 1] = optssr[bigt, ib];
-            
-            ib = ib + 1;
-        endo;
-        
-    endif;                           /*closing the if for the case m >1*/
-    
-    retp(global, datevec, bigvec);
-endp;
-
-@********************************************************************@
 
 proc(1) = ssr(start, y, z, h, last);
     local vecssr, delta1, delta2, inv1, inv2, invz, res, v, f, r;
