@@ -11,14 +11,10 @@ cls;
 library carrionlib;
 
 // Load data
-data = loadd(__FILE_DIR $+ "pankpss_data.dat");
+data = loadd(__FILE_DIR $+ "gdef_pankpss.dat");
 
 // Print data headers
-varnames = upper(getheaders(__FILE_DIR $+ "pankpss_data.dat"));
-
-// Use for cross-sectional demeaning
-// data=data-meanc(data)';
-
+varnames = upper(getheaders(__FILE_DIR $+ "gdef_pankpss.dat"));
 
 /*
 ** Calculation of the test with 1 change to the mean
@@ -73,8 +69,9 @@ bCtl.estimseq = 0;
 
 /*****************************************************************************/
 /*****************************************************************************/
-{ test_hom, test_het, kpsstest, m_br} = pankpss(data, model, model0, kernel, maxlags, bCtl);
+{ test_hom, test_het, kpsstest, m_br} = pankpss(data[., 2:cols(data)], model, model0, kernel, maxlags, bCtl);
 
-plotPanKPSS(data, m_br, kpsstest, 1870, 1, varnames);
+plotPanKPSS(data[., 2:cols(data)], m_br, kpsstest, 1995, 1, varnames[2:rows(varnames)]);
+
 
 
