@@ -27,7 +27,9 @@
         "granada.src",
         "pankpss.src",
         "pankpss_gr.src",
-        "pu_mp.src"
+        "pu_mp.src",
+        "pankpss.src",
+        "pankpss_gr.src"
     ],
     "version": "1.0.1"
 }
