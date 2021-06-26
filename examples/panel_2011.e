@@ -279,26 +279,20 @@ print "I(1) Common factors: " r1_fhat;
 print "MSB_tau_f:  " dd_test_fhat;
 
 
+plotXY(seqa(1,1,rows(fhat)), fhat);
 
-xy(seqa(1,1,rows(fhat)), fhat);
+// Set up plots
+struct plotControl myPlot;
+myPlot = plotGetDefaults("XY");
 
-graphset;
+plotOpenWindow();
+plotSettitle(&myPlot, "GDP");
+plotXY(myPlot, seqa(1973, 0.3, T), w);
 
-_pframe={0,0};
+plotOpenWindow();
+plotSettitle(&myPlot,"M1");
+plotXY(myPlot, seqa(1973, 0.3, T), y);
 
-_pmcolor={1,1,1,1,1,1,15,15,15};
-_pdate=0;
-_pcolor=1;
-_plwidth=15;
-
-
-title("GDP");
-xy(seqa(1973,0.3,T),w);
-
-
-title("M1");
-xy(seqa(1973,0.3,T),y);
-
-
-title("Exchange rates");
-xy(seqa(1973,0.3,T),z);
+plotOpenWindow();
+plotSettitle(&myPlot,"Exchange rates");
+plotXY(myPlot, seqa(1973, 0.3, T), z);
