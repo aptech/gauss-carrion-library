@@ -116,5 +116,5 @@ proc (4) = pankpss(data, model, model0, kernel, maxlags, struct breakControl bCt
     print "Number of observations" rows(data);
     print "Estimated breaking points" m_tb;
     
-    retp(testd_hom, testd_het, m_lee_est, areshape(m_tb, 15|maxlags|maxlags));
+    retp(testd_hom, testd_het, m_lee_est, areshape(m_tb, K|maxlags|maxlags));
 endp;
